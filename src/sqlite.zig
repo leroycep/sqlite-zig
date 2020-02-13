@@ -169,6 +169,14 @@ pub const SQLiteRow = struct {
     pub fn column(self: *const @This(), col: c_int) SQLiteType {
         return self.stmt.column(col);
     }
+
+    pub fn columnInt64(self: *const @This(), col: c_int) i64 {
+        return self.stmt.columnInt64(col);
+    }
+
+    pub fn columnText(self: *const @This(), col: c_int) []const u8 {
+        return self.stmt.columnText(col);
+    }
 };
 
 pub const SQLiteRowsIterator = struct {
@@ -184,7 +192,7 @@ pub const SQLiteRowsIterator = struct {
         return self;
     }
 
-    pub fn next(self: *SQLiteRowsIterator) ?SQLiteError!SQLiteRow {
+    pub fn next(self: *@This()) ?SQLiteError!SQLiteRow {
         if (self.stmt == null) {
             try self.prepareNextStmt();
         }
@@ -201,7 +209,7 @@ pub const SQLiteRowsIterator = struct {
         }
     }
 
-    pub fn finish(self: *SQLiteRowsIterator) !void {
+    pub fn finish(self: *@This()) !void {
         while (self.next()) |row| {
             const _row = try row;
         }
