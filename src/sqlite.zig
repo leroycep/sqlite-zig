@@ -59,8 +59,87 @@ pub const SQLiteStmt = struct {
         return try checkSqliteErr(sqlite3_step(self.stmt));
     }
 
+    pub fn columnCount(self: *const SQLiteStmt) c_int {
+        return sqlite3_column_count(self.stmt);
+    }
+
+    pub fn columnType(self: *const SQLiteStmt, col: c_int) SQLiteTypeTag {
+        switch (sqlite3_column_type(self.stmt, col)) {
+            SQLITE_INTEGER => return .Integer,
+            SQLITE_FLOAT => return .Float,
+            SQLITE_TEXT => return .Text,
+            SQLITE_BLOB => return .Blob,
+            SQLITE_NULL => return .Null,
+            else => panic("Unexpected sqlite datatype", null),
+        }
+    }
+
+    pub fn column(self: *const SQLiteStmt, col: c_int) SQLiteType {
+        switch (self.columnType(col)) {
+            .Integer => return SQLiteType{ .Integer = self.columnInt64(col) },
+            .Float => return SQLiteType{ .Float = self.columnFloat(col) },
+            .Text => return SQLiteType{ .Text = self.columnText(col) },
+            .Blob => return SQLiteType{ .Blob = self.columnBlob(col) },
+            .Null => return SQLiteType{ .Null = {} },
+        }
+    }
+
+    pub fn columnInt(self: *const SQLiteStmt, col: c_int) i32 {
+        return sqlite3_column_int(self.stmt, col);
+    }
+
+    pub fn columnInt64(self: *const SQLiteStmt, col: c_int) i64 {
+        return sqlite3_column_int64(self.stmt, col);
+    }
+
+    pub fn columnFloat(self: *const SQLiteStmt, col: c_int) f64 {
+        return sqlite3_column_double(self.stmt, col);
+    }
+
+    pub fn columnText(self: *const SQLiteStmt, col: c_int) []const u8 {
+        const num_bytes = sqlite3_column_bytes(self.stmt, col);
+        const bytes = sqlite3_column_text(self.stmt, col);
+        return bytes[0..@intCast(usize, num_bytes)];
+    }
+
+    pub fn columnBlob(self: *const SQLiteStmt, col: c_int) []const u8 {
+        const num_bytes = sqlite3_column_bytes(self.stmt, col);
+        const bytes = @ptrCast([*]const u8, sqlite3_column_blob(self.stmt, col));
+        return bytes[0..@intCast(usize, num_bytes)];
+    }
+
     pub fn finalize(self: *const SQLiteStmt) SQLiteError!void {
         _ = try checkSqliteErr(sqlite3_finalize(self.stmt));
+    }
+};
+
+pub const SQLiteTypeTag = enum {
+    Integer,
+    Float,
+    Text,
+    Blob,
+    Null,
+};
+
+pub const SQLiteType = union(SQLiteTypeTag) {
+    Integer: i64,
+    Float: f64,
+    Text: []const u8,
+    Blob: []const u8,
+    Null: void,
+
+    pub fn eql(self: *const SQLiteType, other: *const SQLiteType) bool {
+        if (@as(SQLiteTypeTag, self.*) != @as(SQLiteTypeTag, other.*)) {
+            return false;
+        }
+        switch (self.*) {
+            // Types must be same, and any null is the same as any other null
+            .Null => return true,
+            .Integer => return self.Integer == other.Integer,
+            .Float => return self.Float == other.Float,
+            .Text => return std.mem.eql(u8, self.Text, other.Text),
+            .Blob => return std.mem.eql(u8, self.Blob, other.Blob),
+        }
     }
 };
 
@@ -84,6 +163,28 @@ test "open in memory sqlite db" {
         const curSql = tailSql;
 
         const cur_stmt = (try db.prepare(curSql, &tailSql)) orelse break;
+        var row: usize = 0;
+        while ((try cur_stmt.step()) != .Done) {
+            var col: c_int = 0;
+            while (col < cur_stmt.columnCount()) {
+                const val = cur_stmt.column(col);
+                switch (row) {
+                    0 => switch (col) {
+                        0 => std.testing.expectEqual(SQLiteType{ .Integer = 1 }, val),
+                        1 => std.testing.expect((SQLiteType{ .Text = "world" }).eql(&val)),
+                        else => panic("unexpected col in test", null),
+                    },
+                    1 => switch (col) {
+                        0 => std.testing.expectEqual(SQLiteType{ .Integer = 2 }, val),
+                        1 => std.testing.expect((SQLiteType{ .Text = "foo" }).eql(&val)),
+                        else => panic("unexpected col in test", null),
+                    },
+                    else => panic("unexpected row in test", null),
+                }
+                col += 1;
+            }
+            row += 1;
+        }
         try cur_stmt.finalize();
     }
 
