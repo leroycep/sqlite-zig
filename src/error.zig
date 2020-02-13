@@ -2,6 +2,12 @@ const panic = @import("builtin").panic;
 
 usingnamespace @import("c.zig");
 
+pub const SQLiteResult = enum {
+    Ok,
+    Done,
+    Row,
+};
+
 pub const SQLiteError = error{
     /// Generic  error
     Error,
@@ -13,9 +19,14 @@ pub const SQLiteError = error{
     Corrupt,
 };
 
-pub fn checkSqliteErr(rc: c_int) SQLiteError!void {
+pub fn checkSqliteErr(rc: c_int) SQLiteError!SQLiteResult {
     switch (rc) {
-        SQLITE_OK, SQLITE_DONE => return,
+        // Result codes
+        SQLITE_OK => return SQLiteResult.Ok,
+        SQLITE_DONE => return SQLiteResult.Done,
+        SQLITE_ROW => return SQLiteResult.Row,
+
+        // Error codes
         SQLITE_ERROR => return SQLiteError.Error,
         SQLITE_ABORT => return SQLiteError.Abort,
         SQLITE_AUTH => return SQLiteError.Auth,
