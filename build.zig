@@ -1,6 +1,10 @@
 const std = @import("std");
 const Builder = std.build.Builder;
 
+const EXAMPLES = .{
+    "blog",
+};
+
 pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
 
@@ -11,4 +15,15 @@ pub fn build(b: *Builder) void {
 
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&tests.step);
+
+    const example_step = b.step("examples", "Build examples");
+    inline for (EXAMPLES) |example_name| {
+        const example = b.addExecutable(example_name, "examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig");
+        example.addPackagePath("sqlite", "src/sqlite.zig");
+        example.setBuildMode(mode);
+        example.linkSystemLibrary("sqlite3");
+        example.linkSystemLibrary("c");
+        example.install();
+        example_step.dependOn(&example.step);
+    }
 }

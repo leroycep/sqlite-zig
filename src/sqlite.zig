@@ -30,6 +30,10 @@ pub const SQLite = struct {
         _ = try checkSqliteErr(sqlite3_close(self.db));
     }
 
+    pub fn errmsg(self: *const @This()) ?[*:0]const u8 {
+        return sqlite3_errmsg(self.db);
+    }
+
     pub fn prepare(self: *const @This(), sql: [:0]const u8, sqlTail: ?*[:0]const u8) SQLiteError!?SQLiteStmt {
         var stmt: ?*sqlite3_stmt = undefined;
         const sqlLen = @intCast(c_int, sql.len);
