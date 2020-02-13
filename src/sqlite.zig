@@ -66,11 +66,13 @@ pub const SQLiteStmt = struct {
 test "open in memory sqlite db" {
     const db = try SQLite.open(":memory:");
 
-    const sqlCreateTable = "CREATE TABLE IF NOT EXISTS hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);";
+    // Create the hello table
+    const sqlCreateTable = "CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);";
     const create_stmt = (try db.prepare(sqlCreateTable, null)) orelse return error.NullCreateStmt;
     try create_stmt.step();
     try create_stmt.finalize();
 
+    // Insert values and get results
     const sql =
         \\ INSERT INTO hello (name) VALUES ("world"), ("foo");
         \\ SELECT * FROM hello;
