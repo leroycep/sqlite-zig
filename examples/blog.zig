@@ -12,51 +12,37 @@ const SQL_CREATE_TABLE =
 
 const SQL_GET_POSTS = "SELECT id, title, content FROM posts;";
 
+const CMD_READ_POSTS = "read";
+
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
 
     const db = try sqlite.SQLite.open("blog.db");
-    try initDB(&db);
+    defer db.close() catch unreachable;
 
+    // Create the posts table if it doesn't exist
+    db.exec(SQL_CREATE_TABLE).finish() catch |e| return printSqliteErrMsg(&db, e);
+
+    // Get commandline arguments
     const args = try std.process.argsAlloc(alloc);
     defer std.process.argsFree(alloc, args);
+    if (args.len < 2) return;
 
-    if (args.len < 2) {
-        return;
-    }
+    if (std.mem.eql(u8, args[1], CMD_READ_POSTS)) {
+        var rows = db.exec(SQL_GET_POSTS);
 
-    if (std.mem.eql(u8, args[1], "read")) {
-        try readPosts(&db);
-    }
-    if (std.mem.eql(u8, args[1], "delete")) {
-        std.debug.warn("delete\n", .{});
+        std.debug.warn("Posts:\n", .{});
+        while (rows.next()) |row_erropt| {
+            const row = row_erropt catch |e| return printSqliteErrMsg(&db, e);
+            const id = row.columnInt64(0);
+            const title = row.columnText(1);
+            const content = row.columnText(2);
+            std.debug.warn("\t{}\t{}\t{}\n", .{ id, title, content });
+        }
     }
 }
 
-fn initDB(db: *const sqlite.SQLite) !void {
-    const create_stmt_opt = db.prepare(SQL_CREATE_TABLE, null) catch |e| {
-        std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
-        return e;
-    };
-    const create_stmt = create_stmt_opt orelse panic("Create table statment was null!", null);
-    _ = try create_stmt.step();
-    _ = try create_stmt.finalize();
-}
-
-fn readPosts(db: *const sqlite.SQLite) !void {
-    const read_stmt_opt = db.prepare(SQL_GET_POSTS, null) catch |e| {
-        std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
-        return e;
-    };
-    const read_stmt = read_stmt_opt orelse panic("Read post statement was null!", null);
-
-    std.debug.warn("Posts:\n", .{});
-    while ((try read_stmt.step()) != .Done) {
-        const id = read_stmt.columnInt64(0);
-        const title = read_stmt.columnText(1);
-        const content = read_stmt.columnText(2);
-        std.debug.warn("\t{} {}: {}\n", .{ id, title, content });
-    }
-
-    _ = try read_stmt.finalize();
+fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.SQLiteError) !void {
+    std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
+    return e;
 }
