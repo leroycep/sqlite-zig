@@ -74,3 +74,10 @@ test "open in memory sqlite db" {
     const create_stmt = (try db.prepare(sqlCreateTable, null)) orelse return error.NullCreateStmt;
     defer create_stmt.finalize();
 }
+
+test "Empty SQL prepared" {
+    const db = try SQLite.open(":memory:");
+    defer db.close();
+    const create_stmt = try db.prepare("", null);
+    std.debug.assert(create_stmt == null);
+}
