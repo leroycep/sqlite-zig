@@ -5,6 +5,7 @@ pub const sqliteError = @import("error.zig");
 pub const SQLiteError = sqliteError.SQLiteError;
 pub const SQLiteResult = sqliteError.SQLiteResult;
 pub const checkSqliteErr = sqliteError.checkSqliteErr;
+const bind = @import("bind.zig");
 
 usingnamespace @import("c.zig");
 
@@ -61,6 +62,16 @@ pub const SQLite = struct {
 
     pub fn exec(self: *const @This(), sql: [:0]const u8) SQLiteRowsIterator {
         return SQLiteRowsIterator.init(self, sql);
+    }
+
+    pub fn execBind(self: *const @This(), comptime sql: [:0]const u8, args: var) !SQLiteRowsIterator {
+        var tail: [:0]const u8 = sql;
+        var stmtOpt = try self.prepare(sql, &tail);
+        if (stmtOpt) |stmt| {
+            errdefer stmt.finalize() catch {};
+            try bind.bind(&stmt, sql, args);
+        }
+        return SQLiteRowsIterator{ .db = self, .remaingSql = tail, .stmt = stmtOpt };
     }
 };
 
@@ -335,15 +346,18 @@ test "bind parameters" {
     try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
 
     const NAME = "world!";
+    const NAME2 = "foo";
 
     const insert = (try db.prepare("INSERT INTO hello (name) VALUES (?);", null)).?;
     try insert.bindText(1, NAME);
     _ = try insert.step();
     try insert.finalize();
 
+    try (try db.execBind("INSERT INTO hello (name) VALUES (?);", .{NAME2})).finish();
+
     var rows = db.exec("SELECT name FROM hello;");
-    const row = try rows.next().?;
-    std.testing.expect(row.column(0).eql(&SQLiteType.text(NAME)));
+    std.testing.expect((try rows.next().?).column(0).eql(&SQLiteType.text(NAME)));
+    std.testing.expect((try rows.next().?).column(0).eql(&SQLiteType.text(NAME2)));
 
     try rows.finish();
 
