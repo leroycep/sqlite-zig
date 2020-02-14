@@ -64,11 +64,8 @@ pub fn main() !void {
             return;
         }
 
-        const insertStmt = (db.prepare(SQL_INSERT_POST, null) catch |e| return printSqliteErrMsg(&db, e)).?;
-        try insertStmt.bindText(1, args[2]);
-        try insertStmt.bindText(2, args[3]);
-        _ = try insertStmt.step();
-        try insertStmt.finalize();
+        var exec = try db.execBind(SQL_INSERT_POST, .{ args[2], args[3] });
+        try exec.finish();
     }
 }
 

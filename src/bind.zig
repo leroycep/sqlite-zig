@@ -12,7 +12,7 @@ pub fn bind(stmt: *const SQLiteStmt, comptime sql: [:0]const u8, args: var) SQLi
     comptime var nextArg = 0;
     inline for (sql) |c| {
         if (c == '?') {
-            comptime const arg = args[nextArg];
+            const arg = args[nextArg];
             comptime const argIdx = nextArg + 1;
             try bindType(stmt, argIdx, arg);
             nextArg += 1;
