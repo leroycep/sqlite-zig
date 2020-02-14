@@ -1,4 +1,5 @@
 const panic = @import("builtin").panic;
+const std = @import("std");
 
 usingnamespace @import("c.zig");
 
@@ -17,6 +18,7 @@ pub const SQLiteError = error{
     CantOpen,
     Constraint,
     Corrupt,
+    Range,
 };
 
 pub fn checkSqliteErr(rc: c_int) SQLiteError!SQLiteResult {
@@ -34,7 +36,11 @@ pub fn checkSqliteErr(rc: c_int) SQLiteError!SQLiteResult {
         SQLITE_CANTOPEN => return SQLiteError.CantOpen,
         SQLITE_CONSTRAINT => return SQLiteError.Constraint,
         SQLITE_CORRUPT => return SQLiteError.Corrupt,
-        else => return SQLiteError.Error,
+        SQLITE_RANGE => return SQLiteError.Range,
+        else => |c| {
+            std.debug.warn("unimplement sqlite error code: {}\n", .{c});
+            panic("unimplement sqlite error code\n", null);
+        },
     }
 }
 

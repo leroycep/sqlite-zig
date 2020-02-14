@@ -8,6 +8,10 @@ pub const checkSqliteErr = sqliteError.checkSqliteErr;
 
 usingnamespace @import("c.zig");
 
+/// Workaround Zig translate-c not being able to translate SQLITE_TRANSIENT into an actual value
+const S: isize = -1;
+const ZIG_SQLITE_TRANSIENT: extern fn (?*c_void) void = @intToPtr(extern fn (?*c_void) void, @bitCast(usize, S));
+
 pub const SQLite = struct {
     db: *sqlite3,
 
@@ -114,6 +118,10 @@ pub const SQLiteStmt = struct {
         const num_bytes = sqlite3_column_bytes(self.stmt, col);
         const bytes = @ptrCast([*]const u8, sqlite3_column_blob(self.stmt, col));
         return bytes[0..@intCast(usize, num_bytes)];
+    }
+
+    pub fn bindText(self: *const SQLiteStmt, paramIdx: c_int, text: [:0]const u8) SQLiteError!void {
+        _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
     }
 
     pub fn finalize(self: *const SQLiteStmt) SQLiteError!void {
@@ -318,6 +326,26 @@ test "exec function" {
 
         rowIdx += 1;
     }
+
+    try db.close();
+}
+
+test "bind parameters" {
+    const db = try SQLite.open(":memory:");
+    _ = try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
+
+    const NAME = "world!";
+
+    const insert = (try db.prepare("INSERT INTO hello (name) VALUES (?);", null)).?;
+    _ = try insert.bindText(1, NAME);
+    _ = try insert.step();
+    _ = try insert.finalize();
+
+    var rows = db.exec("SELECT name FROM hello;");
+    const row = try rows.next().?;
+    std.testing.expect(row.column(0).eql(&SQLiteType.text(NAME)));
+
+    try rows.finish();
 
     try db.close();
 }
