@@ -12,6 +12,7 @@ const SQL_CREATE_TABLE =
 
 const SQL_GET_POSTS = "SELECT id, title, content FROM posts;";
 const SQL_GET_POST_BY_ID = "SELECT id, title, content FROM posts WHERE id = ?;";
+const SQL_GET_LAST_INSERTED = "SELECT id, title, content FROM posts WHERE id = last_insert_rowid();";
 
 const SQL_INSERT_POST =
     \\ INSERT INTO
@@ -50,10 +51,11 @@ pub fn main() !void {
 
     var readOpts = ReadOptions{};
     if (std.mem.eql(u8, args[1], CMD_READ_POSTS) and args.len == 3) {
-        readOpts.post = std.fmt.parseInt(i64, args[2], 10) catch {
+        const postId = std.fmt.parseInt(i64, args[2], 10) catch {
             std.debug.warn("Invalid post id\nUsage: {} read [post-id]", .{args[0]});
             return error.NotAnInt;
         };
+        readOpts.singlePost = GetPostBy{ .Id = postId };
     } else if (std.mem.eql(u8, args[1], CMD_CREATE_POST)) {
         if (args.len != 4) {
             std.debug.warn("Error: wrong number of args\nUsage: {} create <title> <content>\n", .{args[0]});
@@ -62,9 +64,12 @@ pub fn main() !void {
 
         var exec = try db.execBind(SQL_INSERT_POST, .{ args[2], args[3] });
         try exec.finish();
+        readOpts.singlePost = GetPostBy{ .LastInserted = {} };
     }
 
-    try read(&db, readOpts);
+    var stdout = std.io.getStdOut().outStream().stream;
+
+    try read(&stdout, &db, readOpts);
 }
 
 fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.SQLiteError) !void {
@@ -72,22 +77,32 @@ fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.SQLiteError) !void {
     return e;
 }
 
-const ReadOptions = struct {
-    post: ?i64 = null,
+const GetPostByTag = enum {
+    Id,
+    LastInserted,
+};
+const GetPostBy = union(GetPostByTag) {
+    Id: i64,
+    LastInserted: void,
 };
 
-fn read(db: *const sqlite.SQLite, opts: ReadOptions) !void {
-    if (opts.post) |post| {
-        var rows = try db.execBind(SQL_GET_POST_BY_ID, .{post});
+const ReadOptions = struct {
+    singlePost: ?GetPostBy = null,
+};
+
+fn read(out: *std.io.OutStream(std.os.WriteError), db: *const sqlite.SQLite, opts: ReadOptions) !void {
+    if (opts.singlePost) |post| {
+        var rows: sqlite.SQLiteRowsIterator = undefined;
+        switch (post) {
+            .Id => |postId| rows = try db.execBind(SQL_GET_POST_BY_ID, .{postId}),
+            .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
+        }
 
         const row = rows.next() orelse {
             std.debug.warn("No post with id '{}'\n", .{post});
             return error.InvalidPostId;
         } catch unreachable;
-        const id = row.columnInt64(0);
-        const title = row.columnText(1);
-        const content = row.columnText(2);
-        std.debug.warn("Id: {}\nTitle: {}\n\n{}\n", .{ id, title, content });
+        try displaySinglePost(out, &row);
 
         try rows.finish();
     } else {
@@ -102,4 +117,17 @@ fn read(db: *const sqlite.SQLite, opts: ReadOptions) !void {
             std.debug.warn("\t{}\t{}\t{}\n", .{ id, title, content });
         }
     }
+}
+
+fn displaySinglePost(out: *std.io.OutStream(std.os.WriteError), row: *const sqlite.SQLiteRow) !void {
+    const id = row.columnInt64(0);
+    const title = row.columnText(1);
+    const content = row.columnText(2);
+    try out.print(
+        \\ Id: {}
+        \\ Title: {}
+        \\
+        \\ {}
+        \\
+    , .{ id, title, content });
 }
