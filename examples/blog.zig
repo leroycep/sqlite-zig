@@ -12,6 +12,15 @@ const SQL_CREATE_TABLE =
 
 const SQL_GET_POSTS = "SELECT id, title, content FROM posts;";
 
+const SQL_INSERT_POST =
+    \\ INSERT INTO
+    \\   posts(title, content)
+    \\ VALUES
+    \\   (?, ?)
+    \\ ;
+;
+
+const CMD_CREATE_POST = "create";
 const CMD_READ_POSTS = "read";
 
 pub fn main() !void {
@@ -26,7 +35,17 @@ pub fn main() !void {
     // Get commandline arguments
     const args = try std.process.argsAlloc(alloc);
     defer std.process.argsFree(alloc, args);
-    if (args.len < 2) return;
+    if (args.len < 2) {
+        std.debug.warn(
+            \\ Incorrect usage.
+            \\ Usage: {} <cmd>
+            \\ Possible commands:
+            \\   {}
+            \\   {}
+            \\
+        , .{ args[0], CMD_CREATE_POST, CMD_READ_POSTS });
+        return;
+    }
 
     if (std.mem.eql(u8, args[1], CMD_READ_POSTS)) {
         var rows = db.exec(SQL_GET_POSTS);
@@ -39,6 +58,17 @@ pub fn main() !void {
             const content = row.columnText(2);
             std.debug.warn("\t{}\t{}\t{}\n", .{ id, title, content });
         }
+    } else if (std.mem.eql(u8, args[1], CMD_CREATE_POST)) {
+        if (args.len != 4) {
+            std.debug.warn("Error: wrong number of args\nUsage: {} create <title> <content>\n", .{args[0]});
+            return;
+        }
+
+        const insertStmt = (db.prepare(SQL_INSERT_POST, null) catch |e| return printSqliteErrMsg(&db, e)).?;
+        _ = try insertStmt.bindText(1, args[2]);
+        _ = try insertStmt.bindText(2, args[3]);
+        _ = try insertStmt.step();
+        _ = try insertStmt.finalize();
     }
 }
 
