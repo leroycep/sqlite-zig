@@ -67,9 +67,9 @@ pub fn main() !void {
         readOpts.singlePost = GetPostBy{ .LastInserted = {} };
     }
 
-    var stdout = std.io.getStdOut().outStream().stream;
+    const stdout = &std.io.getStdOut().outStream().stream;
 
-    try read(&stdout, &db, readOpts);
+    try read(stdout, &db, readOpts);
 }
 
 fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.SQLiteError) !void {
@@ -108,13 +108,13 @@ fn read(out: *std.io.OutStream(std.os.WriteError), db: *const sqlite.SQLite, opt
     } else {
         var rows = db.exec(SQL_GET_POSTS);
 
-        std.debug.warn("Posts:\n", .{});
+        try out.print("Posts:\n", .{});
         while (rows.next()) |row_erropt| {
             const row = row_erropt catch |e| return printSqliteErrMsg(db, e);
             const id = row.columnInt64(0);
             const title = row.columnText(1);
             const content = row.columnText(2);
-            std.debug.warn("\t{}\t{}\t{}\n", .{ id, title, content });
+            try out.print("\t{}\t{}\t{}\n", .{ id, title, content });
         }
     }
 }
