@@ -22,8 +22,18 @@ const SQL_INSERT_POST =
     \\ ;
 ;
 
+const SQL_UPDATE_POST =
+    \\ UPDATE
+    \\   posts
+    \\ SET
+    \\   title = ?,
+    \\   content = ?
+    \\ WHERE id = ?;
+;
+
 const CMD_CREATE_POST = "create";
 const CMD_READ_POSTS = "read";
+const CMD_UPDATE_POST = "update";
 
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
@@ -65,6 +75,22 @@ pub fn main() !void {
         var exec = try db.execBind(SQL_INSERT_POST, .{ args[2], args[3] });
         try exec.finish();
         readOpts.singlePost = GetPostBy{ .LastInserted = {} };
+    } else if (std.mem.eql(u8, args[1], CMD_UPDATE_POST)) {
+        if (args.len != 5) {
+            std.debug.warn("Not enough arguments\nUsage: {} update <post-id> <title> <content>", .{args[0]});
+            return error.NotEnoughArguments;
+        }
+        const id = std.fmt.parseInt(i64, args[2], 10) catch {
+            std.debug.warn("Invalid post id\nUsage: {} update <post-id> <title> <content>", .{args[0]});
+            return error.NotAnInt;
+        };
+        const title = args[3];
+        const content = args[4];
+
+        var exec = try db.execBind(SQL_UPDATE_POST, .{ title, content, id });
+        try exec.finish();
+
+        readOpts.singlePost = GetPostBy{ .Id = id };
     }
 
     const stdout = &std.io.getStdOut().outStream().stream;
