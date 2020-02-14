@@ -299,9 +299,9 @@ test "exec function" {
     const db = try SQLite.open(":memory:");
 
     // Create the hello table
-    _ = try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
+    try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
     // Insert values and get results
-    _ = try db.exec("INSERT INTO hello (name) VALUES (\"world\"), (\"foo\");").finish();
+    try db.exec("INSERT INTO hello (name) VALUES (\"world\"), (\"foo\");").finish();
 
     const expected = [_][2]SQLiteType{
         .{ SQLiteType.int(1), SQLiteType.text("world") },
@@ -332,14 +332,14 @@ test "exec function" {
 
 test "bind parameters" {
     const db = try SQLite.open(":memory:");
-    _ = try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
+    try db.exec("CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);").finish();
 
     const NAME = "world!";
 
     const insert = (try db.prepare("INSERT INTO hello (name) VALUES (?);", null)).?;
-    _ = try insert.bindText(1, NAME);
+    try insert.bindText(1, NAME);
     _ = try insert.step();
-    _ = try insert.finalize();
+    try insert.finalize();
 
     var rows = db.exec("SELECT name FROM hello;");
     const row = try rows.next().?;

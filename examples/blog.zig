@@ -65,10 +65,10 @@ pub fn main() !void {
         }
 
         const insertStmt = (db.prepare(SQL_INSERT_POST, null) catch |e| return printSqliteErrMsg(&db, e)).?;
-        _ = try insertStmt.bindText(1, args[2]);
-        _ = try insertStmt.bindText(2, args[3]);
+        try insertStmt.bindText(1, args[2]);
+        try insertStmt.bindText(2, args[3]);
         _ = try insertStmt.step();
-        _ = try insertStmt.finalize();
+        try insertStmt.finalize();
     }
 }
 
