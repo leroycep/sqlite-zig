@@ -31,9 +31,12 @@ const SQL_UPDATE_POST =
     \\ WHERE id = ?;
 ;
 
+const SQL_DELETE_POST = "DELETE FROM posts WHERE id = ?;";
+
 const CMD_CREATE_POST = "create";
 const CMD_READ_POSTS = "read";
 const CMD_UPDATE_POST = "update";
+const CMD_DELETE_POST = "delete";
 
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
@@ -77,11 +80,11 @@ pub fn main() !void {
         readOpts.singlePost = GetPostBy{ .LastInserted = {} };
     } else if (std.mem.eql(u8, args[1], CMD_UPDATE_POST)) {
         if (args.len != 5) {
-            std.debug.warn("Not enough arguments\nUsage: {} update <post-id> <title> <content>", .{args[0]});
+            std.debug.warn("Not enough arguments\nUsage: {} update <post-id> <title> <content>\n", .{args[0]});
             return error.NotEnoughArguments;
         }
         const id = std.fmt.parseInt(i64, args[2], 10) catch {
-            std.debug.warn("Invalid post id\nUsage: {} update <post-id> <title> <content>", .{args[0]});
+            std.debug.warn("Invalid post id\nUsage: {} update <post-id> <title> <content>\n", .{args[0]});
             return error.NotAnInt;
         };
         const title = args[3];
@@ -91,6 +94,18 @@ pub fn main() !void {
         try exec.finish();
 
         readOpts.singlePost = GetPostBy{ .Id = id };
+    } else if (std.mem.eql(u8, args[1], CMD_DELETE_POST)) {
+        if (args.len != 3) {
+            std.debug.warn("Not enough arguments\nUsage: {} delete <post-id>\n", .{args[0]});
+            return error.WrongNumberOfArguments;
+        }
+        const id = std.fmt.parseInt(i64, args[2], 10) catch {
+            std.debug.warn("Invalid post id\nUsage: {} delete <post-id>\n", .{args[0]});
+            return error.NotAnInt;
+        };
+
+        var exec = try db.execBind(SQL_DELETE_POST, .{id});
+        try exec.finish();
     }
 
     const stdout = &std.io.getStdOut().outStream().stream;
