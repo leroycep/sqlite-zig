@@ -28,6 +28,9 @@ pub fn bind(stmt: *const SQLiteStmt, comptime sql: [:0]const u8, args: var) SQLi
 pub fn bindType(stmt: *const SQLiteStmt, comptime paramIdx: comptime_int, value: var) SQLiteError!void {
     const T = @TypeOf(value);
     switch (@typeInfo(T)) {
+        .Int => {
+            try stmt.bindInt64(paramIdx, value);
+        },
         .Pointer => |ptr_info| switch (ptr_info.size) {
             .One => switch (@typeInfo(ptr_info.child)) {
                 .Array => |info| {

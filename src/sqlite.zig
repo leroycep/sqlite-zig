@@ -131,6 +131,10 @@ pub const SQLiteStmt = struct {
         return bytes[0..@intCast(usize, num_bytes)];
     }
 
+    pub fn bindInt64(self: *const SQLiteStmt, paramIdx: c_int, number: i64) SQLiteError!void {
+        _ = try checkSqliteErr(sqlite3_bind_int64(self.stmt, paramIdx, number));
+    }
+
     pub fn bindText(self: *const SQLiteStmt, paramIdx: c_int, text: []const u8) SQLiteError!void {
         _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
     }
