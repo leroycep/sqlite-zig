@@ -2,6 +2,7 @@ const std = @import("std");
 const Builder = std.build.Builder;
 
 const EXAMPLES = .{
+    "simple",
     "blog",
 };
 

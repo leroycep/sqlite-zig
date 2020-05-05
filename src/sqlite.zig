@@ -41,7 +41,7 @@ pub const SQLite = struct {
 
     pub fn prepare(self: *const @This(), sql: [:0]const u8, sqlTail: ?*[:0]const u8) SQLiteError!?SQLiteStmt {
         var stmt: ?*sqlite3_stmt = null;
-        const sqlLen = @intCast(c_int, sql.len);
+        const sqlLen = @intCast(c_int, sql.len + 1);
         var tail: ?[*]u8 = undefined;
 
         var rc = sqlite3_prepare_v2(self.db, sql, sqlLen, &stmt, &tail);
@@ -193,6 +193,10 @@ pub const SQLiteRow = struct {
         return self.stmt.column(col);
     }
 
+    pub fn columnInt(self: *const @This(), col: c_int) i32 {
+        return self.stmt.columnInt(col);
+    }
+
     pub fn columnInt64(self: *const @This(), col: c_int) i64 {
         return self.stmt.columnInt64(col);
     }
@@ -215,16 +219,23 @@ pub const SQLiteRowsIterator = struct {
         return self;
     }
 
-    pub fn next(self: *@This()) ?SQLiteError!SQLiteRow {
+    pub const Item = union(enum) {
+        Row: SQLiteRow,
+        Done: void,
+        Error: SQLiteError,
+    };
+
+    pub fn next(self: *@This()) ?Item {
         if (self.stmt == null) {
-            try self.prepareNextStmt();
+            self.prepareNextStmt() catch |e| return Item{ .Error = e };
         }
         if (self.stmt) |stmt| {
-            switch (try stmt.step()) {
-                .Row, .Ok => return SQLiteRow{ .stmt = stmt },
+            const step_res = stmt.step() catch |e| return Item{ .Error = e };
+            switch (step_res) {
+                .Row, .Ok => return Item{ .Row = SQLiteRow{ .stmt = stmt } },
                 .Done => {
-                    try self.finalizeStmt();
-                    return null;
+                    self.finalizeStmt() catch |e| return Item{ .Error = e };
+                    return Item{ .Done = .{} };
                 },
             }
         } else {
@@ -233,8 +244,11 @@ pub const SQLiteRowsIterator = struct {
     }
 
     pub fn finish(self: *@This()) !void {
-        while (self.next()) |row| {
-            const _row = try row;
+        while (self.next()) |item| {
+            switch (item) {
+                .Error => |e| return e,
+                else => {},
+            }
         }
     }
 
@@ -326,8 +340,12 @@ test "exec function" {
     var rows = db.exec("SELECT * FROM hello;");
 
     var rowIdx: usize = 0;
-    while (rows.next()) |row_err| {
-        const row = row_err catch panic("Error unwrapping row", null);
+    while (rows.next()) |rows_item| {
+        const row = switch (rows_item) {
+            .Row => |r| r,
+            .Done => continue,
+            .Error => panic("Error unwrapping row", null),
+        };
         const expectedRow = expected[rowIdx];
 
         var colIdx: usize = 0;
@@ -341,6 +359,47 @@ test "exec function" {
 
         rowIdx += 1;
     }
+
+    try db.close();
+}
+
+test "exec multiple statement" {
+    const db = try SQLite.open(":memory:");
+
+    const expected = [_][2]SQLiteType{
+        .{ SQLiteType.int(1), SQLiteType.text("world") },
+        .{ SQLiteType.int(2), SQLiteType.text("foo") },
+    };
+
+    // Create the hello table, insert test values, and get results
+    var rows = db.exec(
+        \\ CREATE TABLE hello (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+        \\ INSERT INTO hello (name) VALUES ("world"), ("foo");
+        \\ SELECT * FROM hello;
+    );
+
+    var rowIdx: usize = 0;
+    while (rows.next()) |rows_item| {
+        const row = switch (rows_item) {
+            .Row => |r| r,
+            .Done => continue,
+            .Error => |e| return e,
+        };
+        const expectedRow = expected[rowIdx];
+
+        var colIdx: usize = 0;
+        while (colIdx < row.columnCount()) {
+            const col = row.column(@intCast(c_int, colIdx));
+            const expectedCol = expectedRow[colIdx];
+            std.testing.expect(expectedCol.eql(&col));
+
+            colIdx += 1;
+        }
+
+        rowIdx += 1;
+    }
+
+    std.testing.expectEqual(@as(usize, 2), rowIdx);
 
     try db.close();
 }
@@ -360,10 +419,10 @@ test "bind parameters" {
     try (try db.execBind("INSERT INTO hello (name) VALUES (?);", .{NAME2})).finish();
 
     var rows = db.exec("SELECT name FROM hello;");
-    std.testing.expect((try rows.next().?).column(0).eql(&SQLiteType.text(NAME)));
-    std.testing.expect((try rows.next().?).column(0).eql(&SQLiteType.text(NAME2)));
-
-    try rows.finish();
+    std.testing.expect(rows.next().?.Row.column(0).eql(&SQLiteType.text(NAME)));
+    std.testing.expect(rows.next().?.Row.column(0).eql(&SQLiteType.text(NAME2)));
+    std.testing.expect(rows.next().? == .Done);
+    std.testing.expect(rows.next() == null);
 
     try db.close();
 }

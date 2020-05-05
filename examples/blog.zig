@@ -141,19 +141,23 @@ fn read(out: var, db: *const sqlite.SQLite, opts: ReadOptions) !void {
             .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
         }
 
-        const row = rows.next() orelse {
+        const item = rows.next() orelse {
             std.debug.warn("No post with id '{}'\n", .{post});
             return error.InvalidPostId;
-        } catch unreachable;
-        try displaySinglePost(out, &row);
+        };
+        try displaySinglePost(out, &item.Row);
 
         try rows.finish();
     } else {
         var rows = db.exec(SQL_GET_POSTS);
 
         try out.print("Posts:\n", .{});
-        while (rows.next()) |row_erropt| {
-            const row = row_erropt catch |e| return printSqliteErrMsg(db, e);
+        while (rows.next()) |row_item| {
+            const row = switch (row_item) {
+                .Row => |r| r,
+                .Done => continue,
+                .Error => |e| return printSqliteErrMsg(db, e),
+            };
             const id = row.columnInt64(0);
             const title = row.columnText(1);
             const content = row.columnText(2);
