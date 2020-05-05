@@ -57,8 +57,10 @@ pub fn main() !void {
             \\ Possible commands:
             \\   {}
             \\   {}
+            \\   {}
+            \\   {}
             \\
-        , .{ args[0], CMD_CREATE_POST, CMD_READ_POSTS });
+        , .{ args[0], CMD_CREATE_POST, CMD_READ_POSTS, CMD_UPDATE_POST, CMD_DELETE_POST });
         return;
     }
 
@@ -108,7 +110,7 @@ pub fn main() !void {
         try exec.finish();
     }
 
-    const stdout = &std.io.getStdOut().outStream().stream;
+    const stdout = &std.io.getStdOut().outStream();
 
     try read(stdout, &db, readOpts);
 }
@@ -131,7 +133,7 @@ const ReadOptions = struct {
     singlePost: ?GetPostBy = null,
 };
 
-fn read(out: *std.io.OutStream(std.os.WriteError), db: *const sqlite.SQLite, opts: ReadOptions) !void {
+fn read(out: var, db: *const sqlite.SQLite, opts: ReadOptions) !void {
     if (opts.singlePost) |post| {
         var rows: sqlite.SQLiteRowsIterator = undefined;
         switch (post) {
@@ -160,7 +162,7 @@ fn read(out: *std.io.OutStream(std.os.WriteError), db: *const sqlite.SQLite, opt
     }
 }
 
-fn displaySinglePost(out: *std.io.OutStream(std.os.WriteError), row: *const sqlite.SQLiteRow) !void {
+fn displaySinglePost(out: var, row: *const sqlite.SQLiteRow) !void {
     const id = row.columnInt64(0);
     const title = row.columnText(1);
     const content = row.columnText(2);
