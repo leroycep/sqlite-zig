@@ -18,7 +18,7 @@ example.linkSystemLibrary("c");
 
 Make sure you have `sqlite3` installed on you system.
 
-`sqlite.zig` was developed with `zig 0.5.0+ab4ea5d3c`.
+`sqlite.zig` works with `zig 0.6.0`.
 
 ## Examples
 
