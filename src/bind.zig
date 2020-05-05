@@ -1,13 +1,12 @@
 const std = @import("std");
-pub const sqliteError = @import("error.zig");
-pub const SQLiteError = sqliteError.SQLiteError;
-pub const SQLiteResult = sqliteError.SQLiteResult;
-pub const checkSqliteErr = sqliteError.checkSqliteErr;
-pub const SQLiteStmt = @import("sqlite.zig").SQLiteStmt;
+const errors = @import("error.zig");
+const Error = errors.Error;
+const checkSqliteErr = errors.checkSqliteErr;
+const SQLiteStmt = @import("sqlite.zig").SQLiteStmt;
 
 usingnamespace @import("c.zig");
 
-pub fn bind(stmt: *const SQLiteStmt, comptime sql: [:0]const u8, args: var) SQLiteError!void {
+pub fn bind(stmt: *const SQLiteStmt, comptime sql: [:0]const u8, args: var) Error!void {
     // TODO: Make this more robust. Make it clear that SQL is not actually being parsed
     comptime var nextArg = 0;
     inline for (sql) |c| {
@@ -25,7 +24,7 @@ pub fn bind(stmt: *const SQLiteStmt, comptime sql: [:0]const u8, args: var) SQLi
     }
 }
 
-pub fn bindType(stmt: *const SQLiteStmt, comptime paramIdx: comptime_int, value: var) SQLiteError!void {
+pub fn bindType(stmt: *const SQLiteStmt, comptime paramIdx: comptime_int, value: var) Error!void {
     const T = @TypeOf(value);
     switch (@typeInfo(T)) {
         .Int => {

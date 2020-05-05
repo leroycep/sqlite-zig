@@ -115,7 +115,7 @@ pub fn main() !void {
     try read(stdout, &db, readOpts);
 }
 
-fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.SQLiteError) !void {
+fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.Error) !void {
     std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
     return e;
 }

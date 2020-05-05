@@ -1,10 +1,10 @@
 const std = @import("std");
 const panic = @import("builtin").panic;
 const Allocator = std.mem.Allocator;
-pub const sqliteError = @import("error.zig");
-pub const SQLiteError = sqliteError.SQLiteError;
-pub const SQLiteResult = sqliteError.SQLiteResult;
-pub const checkSqliteErr = sqliteError.checkSqliteErr;
+pub const errors = @import("error.zig");
+pub const Error = errors.Error;
+pub const Success = errors.Success;
+pub const checkSqliteErr = errors.checkSqliteErr;
 const bind = @import("bind.zig");
 
 usingnamespace @import("c.zig");
@@ -16,11 +16,11 @@ const ZIG_SQLITE_TRANSIENT: extern fn (?*c_void) void = @intToPtr(extern fn (?*c
 pub const SQLite = struct {
     db: *sqlite3,
 
-    pub fn open(filename: [:0]const u8) SQLiteError!@This() {
+    pub fn open(filename: [:0]const u8) Error!@This() {
         var db: ?*sqlite3 = undefined;
 
         var rc = sqlite3_open(filename, &db);
-        errdefer sqliteError.assertOkay(sqlite3_close(db));
+        errdefer errors.assertOkay(sqlite3_close(db));
 
         _ = try checkSqliteErr(rc);
 
@@ -31,7 +31,7 @@ pub const SQLite = struct {
         };
     }
 
-    pub fn close(self: *const @This()) SQLiteError!void {
+    pub fn close(self: *const @This()) Error!void {
         _ = try checkSqliteErr(sqlite3_close(self.db));
     }
 
@@ -39,7 +39,7 @@ pub const SQLite = struct {
         return sqlite3_errmsg(self.db);
     }
 
-    pub fn prepare(self: *const @This(), sql: [:0]const u8, sqlTail: ?*[:0]const u8) SQLiteError!?SQLiteStmt {
+    pub fn prepare(self: *const @This(), sql: [:0]const u8, sqlTail: ?*[:0]const u8) Error!?SQLiteStmt {
         var stmt: ?*sqlite3_stmt = null;
         const sqlLen = @intCast(c_int, sql.len + 1);
         var tail: ?[*]u8 = undefined;
@@ -78,7 +78,7 @@ pub const SQLite = struct {
 pub const SQLiteStmt = struct {
     stmt: *sqlite3_stmt,
 
-    pub fn step(self: *const SQLiteStmt) SQLiteError!SQLiteResult {
+    pub fn step(self: *const SQLiteStmt) Error!Success {
         return try checkSqliteErr(sqlite3_step(self.stmt));
     }
 
@@ -131,15 +131,15 @@ pub const SQLiteStmt = struct {
         return bytes[0..@intCast(usize, num_bytes)];
     }
 
-    pub fn bindInt64(self: *const SQLiteStmt, paramIdx: c_int, number: i64) SQLiteError!void {
+    pub fn bindInt64(self: *const SQLiteStmt, paramIdx: c_int, number: i64) Error!void {
         _ = try checkSqliteErr(sqlite3_bind_int64(self.stmt, paramIdx, number));
     }
 
-    pub fn bindText(self: *const SQLiteStmt, paramIdx: c_int, text: []const u8) SQLiteError!void {
+    pub fn bindText(self: *const SQLiteStmt, paramIdx: c_int, text: []const u8) Error!void {
         _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
     }
 
-    pub fn finalize(self: *const SQLiteStmt) SQLiteError!void {
+    pub fn finalize(self: *const SQLiteStmt) Error!void {
         _ = try checkSqliteErr(sqlite3_finalize(self.stmt));
     }
 };
@@ -222,7 +222,7 @@ pub const SQLiteRowsIterator = struct {
     pub const Item = union(enum) {
         Row: SQLiteRow,
         Done: void,
-        Error: SQLiteError,
+        Error: Error,
     };
 
     pub fn next(self: *@This()) ?Item {
