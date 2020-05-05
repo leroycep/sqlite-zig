@@ -6,12 +6,11 @@ pub fn main() !void {
     defer db.close() catch unreachable;
 
     var rows = db.exec(
-        \\ CREATE TABLE IF NOT EXISTS users(
+        \\ DROP TABLE IF EXISTS users;
+        \\ CREATE TABLE users(
         \\   id INTEGER PRIMARY KEY AUTOINCREMENT,
         \\   username TEXT NOT NULL
         \\ );
-        \\ DELETE FROM users;
-        \\ VACUUM;
         \\ INSERT INTO users(username)
         \\ VALUES
         \\   ("shallan"),
