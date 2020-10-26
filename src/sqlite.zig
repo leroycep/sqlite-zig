@@ -31,6 +31,50 @@ pub const SQLite = struct {
         };
     }
 
+    pub const OpenOptions = struct {
+        mode: enum { readonly, readwrite, readwrite_create } = .readwrite_create,
+        interpret_as_uri: bool = false,
+        in_memory: bool = false,
+        threading: ?enum { no_mutex, full_mutex } = null,
+        cache: ?enum { shared, private } = null,
+        vfs_module: ?[:0]const u8 = null,
+    };
+
+    pub fn openWithOptions(filename: [:0]const u8, options: OpenOptions) Error!@This() {
+        var db: ?*sqlite3 = undefined;
+
+        var option_flags: c_int = switch (options.mode) {
+            .readonly => SQLITE_OPEN_READONLY,
+            .readwrite => SQLITE_OPEN_READWRITE,
+            .readwrite_create => SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+        };
+        if (options.interpret_as_uri) option_flags |= SQLITE_OPEN_URI;
+        if (options.in_memory) option_flags |= SQLITE_OPEN_MEMORY;
+        if (options.threading) |threading| {
+            option_flags |= @as(c_int, switch (threading) {
+                .no_mutex => SQLITE_OPEN_NOMUTEX,
+                .full_mutex => SQLITE_OPEN_FULLMUTEX,
+            });
+        }
+        if (options.cache) |cache| {
+            option_flags |= @as(c_int, switch (cache) {
+                .shared => SQLITE_OPEN_SHAREDCACHE,
+                .private => SQLITE_OPEN_PRIVATECACHE,
+            });
+        }
+
+        var rc = sqlite3_open_v2(filename, &db, option_flags, options.vfs_module orelse 0);
+        errdefer errors.assertOkay(sqlite3_close(db));
+
+        _ = try checkSqliteErr(rc);
+
+        var dbNonNull = db orelse panic("No error, sqlite db should not be null", null);
+
+        return @This(){
+            .db = dbNonNull,
+        };
+    }
+
     pub fn close(self: *const @This()) Error!void {
         _ = try checkSqliteErr(sqlite3_close(self.db));
     }
