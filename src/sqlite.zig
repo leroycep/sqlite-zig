@@ -11,7 +11,7 @@ usingnamespace @import("c.zig");
 
 /// Workaround Zig translate-c not being able to translate SQLITE_TRANSIENT into an actual value
 const S: isize = -1;
-const ZIG_SQLITE_TRANSIENT: extern fn (?*c_void) void = @intToPtr(extern fn (?*c_void) void, @bitCast(usize, S));
+const ZIG_SQLITE_TRANSIENT: fn (?*c_void) callconv(.C) void = @intToPtr(fn (?*c_void) callconv(.C) void, @bitCast(usize, S));
 
 pub const SQLite = struct {
     db: *sqlite3,
@@ -108,7 +108,7 @@ pub const SQLite = struct {
         return SQLiteRowsIterator.init(self, sql);
     }
 
-    pub fn execBind(self: *const @This(), comptime sql: [:0]const u8, args: var) !SQLiteRowsIterator {
+    pub fn execBind(self: *const @This(), comptime sql: [:0]const u8, args: anytype) !SQLiteRowsIterator {
         var tail: [:0]const u8 = sql;
         var stmtOpt = try self.prepare(sql, &tail);
         if (stmtOpt) |stmt| {

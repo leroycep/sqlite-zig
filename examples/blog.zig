@@ -133,7 +133,7 @@ const ReadOptions = struct {
     singlePost: ?GetPostBy = null,
 };
 
-fn read(out: var, db: *const sqlite.SQLite, opts: ReadOptions) !void {
+fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
     if (opts.singlePost) |post| {
         var rows: sqlite.SQLiteRowsIterator = undefined;
         switch (post) {
@@ -166,7 +166,7 @@ fn read(out: var, db: *const sqlite.SQLite, opts: ReadOptions) !void {
     }
 }
 
-fn displaySinglePost(out: var, row: *const sqlite.SQLiteRow) !void {
+fn displaySinglePost(out: anytype, row: *const sqlite.SQLiteRow) !void {
     const id = row.columnInt64(0);
     const title = row.columnText(1);
     const content = row.columnText(2);
