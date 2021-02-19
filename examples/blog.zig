@@ -53,12 +53,12 @@ pub fn main() !void {
     if (args.len < 2) {
         std.debug.warn(
             \\ Incorrect usage.
-            \\ Usage: {} <cmd>
+            \\ Usage: {s} <cmd>
             \\ Possible commands:
-            \\   {}
-            \\   {}
-            \\   {}
-            \\   {}
+            \\   {s}
+            \\   {s}
+            \\   {s}
+            \\   {s}
             \\
         , .{ args[0], CMD_CREATE_POST, CMD_READ_POSTS, CMD_UPDATE_POST, CMD_DELETE_POST });
         return;
@@ -67,13 +67,13 @@ pub fn main() !void {
     var readOpts = ReadOptions{};
     if (std.mem.eql(u8, args[1], CMD_READ_POSTS) and args.len == 3) {
         const postId = std.fmt.parseInt(i64, args[2], 10) catch {
-            std.debug.warn("Invalid post id\nUsage: {} read [post-id]", .{args[0]});
+            std.debug.warn("Invalid post id\nUsage: {s} read [post-id]", .{args[0]});
             return error.NotAnInt;
         };
         readOpts.singlePost = GetPostBy{ .Id = postId };
     } else if (std.mem.eql(u8, args[1], CMD_CREATE_POST)) {
         if (args.len != 4) {
-            std.debug.warn("Error: wrong number of args\nUsage: {} create <title> <content>\n", .{args[0]});
+            std.debug.warn("Error: wrong number of args\nUsage: {s} create <title> <content>\n", .{args[0]});
             return;
         }
 
@@ -82,11 +82,11 @@ pub fn main() !void {
         readOpts.singlePost = GetPostBy{ .LastInserted = {} };
     } else if (std.mem.eql(u8, args[1], CMD_UPDATE_POST)) {
         if (args.len != 5) {
-            std.debug.warn("Not enough arguments\nUsage: {} update <post-id> <title> <content>\n", .{args[0]});
+            std.debug.warn("Not enough arguments\nUsage: {s} update <post-id> <title> <content>\n", .{args[0]});
             return error.NotEnoughArguments;
         }
         const id = std.fmt.parseInt(i64, args[2], 10) catch {
-            std.debug.warn("Invalid post id\nUsage: {} update <post-id> <title> <content>\n", .{args[0]});
+            std.debug.warn("Invalid post id\nUsage: {s} update <post-id> <title> <content>\n", .{args[0]});
             return error.NotAnInt;
         };
         const title = args[3];
@@ -98,11 +98,11 @@ pub fn main() !void {
         readOpts.singlePost = GetPostBy{ .Id = id };
     } else if (std.mem.eql(u8, args[1], CMD_DELETE_POST)) {
         if (args.len != 3) {
-            std.debug.warn("Not enough arguments\nUsage: {} delete <post-id>\n", .{args[0]});
+            std.debug.warn("Not enough arguments\nUsage: {s} delete <post-id>\n", .{args[0]});
             return error.WrongNumberOfArguments;
         }
         const id = std.fmt.parseInt(i64, args[2], 10) catch {
-            std.debug.warn("Invalid post id\nUsage: {} delete <post-id>\n", .{args[0]});
+            std.debug.warn("Invalid post id\nUsage: {s} delete <post-id>\n", .{args[0]});
             return error.NotAnInt;
         };
 
@@ -110,7 +110,7 @@ pub fn main() !void {
         try exec.finish();
     }
 
-    const stdout = &std.io.getStdOut().outStream();
+    const stdout = &std.io.getStdOut().writer();
 
     try read(stdout, &db, readOpts);
 }
@@ -161,7 +161,7 @@ fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
             const id = row.columnInt64(0);
             const title = row.columnText(1);
             const content = row.columnText(2);
-            try out.print("\t{}\t{}\t{}\n", .{ id, title, content });
+            try out.print("\t{}\t{s}\t{s}\n", .{ id, title, content });
         }
     }
 }
@@ -172,9 +172,9 @@ fn displaySinglePost(out: anytype, row: *const sqlite.SQLiteRow) !void {
     const content = row.columnText(2);
     try out.print(
         \\ Id: {}
-        \\ Title: {}
+        \\ Title: {s}
         \\
-        \\ {}
+        \\ {s}
         \\
     , .{ id, title, content });
 }

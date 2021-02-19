@@ -21,8 +21,8 @@ pub fn main() !void {
         \\ SELECT id, username FROM users;
     );
 
-    std.debug.warn(" {}\t{}\n", .{ "id", "username" });
-    std.debug.warn(" {}\t{}\n", .{ "--", "--------" });
+    std.debug.warn(" {s}\t{s}\n", .{ "id", "username" });
+    std.debug.warn(" {s}\t{s}\n", .{ "--", "--------" });
     while (rows.next()) |row_item| {
         const row = switch (row_item) {
             // Ignore when statements are completed
@@ -37,6 +37,6 @@ pub fn main() !void {
         const id = row.columnInt(0);
         const username = row.columnText(1);
 
-        std.debug.warn(" {}\t{}\n", .{ id, username });
+        std.debug.warn(" {}\t{s}\n", .{ id, username });
     }
 }
