@@ -8,9 +8,15 @@ const EXAMPLES = .{
 
 pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
+    const target = b.standardTargetOptions(.{});
 
     const tests = b.addTest("src/sqlite.zig");
     tests.setBuildMode(mode);
+    //Added by me
+    tests.setTarget(target);
+    tests.addIncludeDir("../sqlite-c/");
+    tests.addLibPath("../sqlite-c/");
+
     tests.linkSystemLibrary("sqlite3");
     tests.linkSystemLibrary("c");
 
@@ -22,6 +28,11 @@ pub fn build(b: *Builder) void {
         const example = b.addExecutable(example_name, "examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig");
         example.addPackagePath("sqlite", "src/sqlite.zig");
         example.setBuildMode(mode);
+        //Added by me
+        example.setTarget(target);
+        example.addIncludeDir("../sqlite-c/");
+        example.addLibPath("../sqlite-c/");
+
         example.linkSystemLibrary("sqlite3");
         example.linkSystemLibrary("c");
 

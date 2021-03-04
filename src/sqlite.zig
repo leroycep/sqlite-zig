@@ -183,8 +183,20 @@ pub const SQLiteStmt = struct {
         _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
     }
 
+    pub fn bindBlob(self: *const SQLiteStmt, paramIdx: c_int, blob: []const u8) Error!void {
+        _ = try checkSqliteErr(sqlite3_bind_blob(self.stmt, paramIdx, blob.ptr, @intCast(c_int, blob.len), ZIG_SQLITE_TRANSIENT));
+    }
+
     pub fn finalize(self: *const SQLiteStmt) Error!void {
         _ = try checkSqliteErr(sqlite3_finalize(self.stmt));
+    }
+
+    pub fn reset(self: *const SQLiteStmt) Error!void {
+        _ = try checkSqliteErr(sqlite3_reset(self.stmt));
+    }
+
+    pub fn clearBindings(self: *const SQLiteStmt) Error!void {
+        _ = try checkSqliteErr(sqlite3_clear_bindings(self.stmt));
     }
 };
 
@@ -247,6 +259,10 @@ pub const SQLiteRow = struct {
 
     pub fn columnText(self: *const @This(), col: c_int) []const u8 {
         return self.stmt.columnText(col);
+    }
+
+    pub fn columnBlob(self: *const @This(), col: c_int) []const u8 {
+        return self.stmt.columnBlob(col);
     }
 };
 
