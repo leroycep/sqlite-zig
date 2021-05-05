@@ -141,7 +141,7 @@ fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
             .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
         }
 
-        const item = rows.next() orelse {
+        const item = (try rows.next()) orelse {
             std.debug.warn("No post with id '{}'\n", .{post});
             return error.InvalidPostId;
         };
@@ -152,11 +152,10 @@ fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
         var rows = db.exec(SQL_GET_POSTS);
 
         try out.print("Posts:\n", .{});
-        while (rows.next()) |row_item| {
+        while (try rows.next()) |row_item| {
             const row = switch (row_item) {
                 .Row => |r| r,
                 .Done => continue,
-                .Error => |e| return printSqliteErrMsg(db, e),
             };
             const id = row.columnInt64(0);
             const title = row.columnText(1);

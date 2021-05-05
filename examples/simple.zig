@@ -23,15 +23,16 @@ pub fn main() !void {
 
     std.debug.warn(" {s}\t{s}\n", .{ "id", "username" });
     std.debug.warn(" {s}\t{s}\n", .{ "--", "--------" });
-    while (rows.next()) |row_item| {
+    while (true) {
+        const row_item_opt = rows.next() catch |e| {
+            std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
+            return e;
+        };
+        const row_item = row_item_opt orelse break;
         const row = switch (row_item) {
             // Ignore when statements are completed
             .Done => continue,
             .Row => |r| r,
-            .Error => |e| {
-                std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
-                return e;
-            },
         };
 
         const id = row.columnInt(0);

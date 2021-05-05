@@ -278,19 +278,18 @@ pub const SQLiteRowsIterator = struct {
     pub const Item = union(enum) {
         Row: SQLiteRow,
         Done: void,
-        Error: Error,
     };
 
-    pub fn next(self: *@This()) ?Item {
+    pub fn next(self: *@This()) !?Item {
         if (self.stmt == null) {
-            self.prepareNextStmt() catch |e| return Item{ .Error = e };
+            try self.prepareNextStmt();
         }
         if (self.stmt) |stmt| {
-            const step_res = stmt.step() catch |e| return Item{ .Error = e };
+            const step_res = try stmt.step();
             switch (step_res) {
                 .Row, .Ok => return Item{ .Row = SQLiteRow{ .stmt = stmt } },
                 .Done => {
-                    self.finalizeStmt() catch |e| return Item{ .Error = e };
+                    try self.finalizeStmt();
                     return Item{ .Done = .{} };
                 },
             }
@@ -300,12 +299,7 @@ pub const SQLiteRowsIterator = struct {
     }
 
     pub fn finish(self: *@This()) !void {
-        while (self.next()) |item| {
-            switch (item) {
-                .Error => |e| return e,
-                else => {},
-            }
-        }
+        while (try self.next()) |item| {}
     }
 
     fn finalizeStmt(self: *@This()) !void {
@@ -396,11 +390,10 @@ test "exec function" {
     var rows = db.exec("SELECT * FROM hello;");
 
     var rowIdx: usize = 0;
-    while (rows.next()) |rows_item| {
+    while (try rows.next()) |rows_item| {
         const row = switch (rows_item) {
             .Row => |r| r,
             .Done => continue,
-            .Error => panic("Error unwrapping row", null),
         };
         const expectedRow = expected[rowIdx];
 
@@ -435,11 +428,10 @@ test "exec multiple statement" {
     );
 
     var rowIdx: usize = 0;
-    while (rows.next()) |rows_item| {
+    while (try rows.next()) |rows_item| {
         const row = switch (rows_item) {
             .Row => |r| r,
             .Done => continue,
-            .Error => |e| return e,
         };
         const expectedRow = expected[rowIdx];
 
@@ -475,10 +467,10 @@ test "bind parameters" {
     try (try db.execBind("INSERT INTO hello (name) VALUES (?);", .{NAME2})).finish();
 
     var rows = db.exec("SELECT name FROM hello;");
-    std.testing.expect(rows.next().?.Row.column(0).eql(&SQLiteType.text(NAME)));
-    std.testing.expect(rows.next().?.Row.column(0).eql(&SQLiteType.text(NAME2)));
-    std.testing.expect(rows.next().? == .Done);
-    std.testing.expect(rows.next() == null);
+    std.testing.expect((try rows.next()).?.Row.column(0).eql(&SQLiteType.text(NAME)));
+    std.testing.expect((try rows.next()).?.Row.column(0).eql(&SQLiteType.text(NAME2)));
+    std.testing.expect((try rows.next()).? == .Done);
+    std.testing.expect((try rows.next()) == null);
 
     try db.close();
 }
