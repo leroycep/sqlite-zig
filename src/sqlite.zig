@@ -256,6 +256,10 @@ pub const SQLiteRow = struct {
     pub fn columnText(self: *const @This(), col: c_int) []const u8 {
         return self.stmt.columnText(col);
     }
+
+    pub fn columnBlob(self: *const @This(), col: c_int) []const u8 {
+        return self.stmt.columnBlob(col);
+    }
 };
 
 pub const SQLiteRowsIterator = struct {
