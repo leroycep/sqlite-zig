@@ -140,6 +140,7 @@ fn read(out: anytype, db: *const sqlite.Db, opts: ReadOptions) !void {
             .Id => |postId| rows = try db.execBind(SQL_GET_POST_BY_ID, .{postId}),
             .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
         }
+        defer rows.finalize() catch {};
 
         const item = (try rows.next()) orelse {
             std.debug.warn("No post with id '{}'\n", .{post});
@@ -150,6 +151,7 @@ fn read(out: anytype, db: *const sqlite.Db, opts: ReadOptions) !void {
         try rows.finish();
     } else {
         var rows = db.exec(SQL_GET_POSTS);
+        defer rows.finalize() catch {};
 
         try out.print("Posts:\n", .{});
         while (try rows.next()) |row_item| {

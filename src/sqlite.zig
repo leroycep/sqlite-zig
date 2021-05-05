@@ -275,6 +275,11 @@ pub const RowsIterator = struct {
         return self;
     }
 
+    // An error will only be returned if the most recent evaluation failed
+    pub fn finalize(this: *@This()) !void {
+        try this.finalizeStmt();
+    }
+
     pub const Item = union(enum) {
         Row: Row,
         Done: void,
@@ -388,6 +393,7 @@ test "exec function" {
     };
 
     var rows = db.exec("SELECT * FROM hello;");
+    defer rows.finalize() catch {};
 
     var rowIdx: usize = 0;
     while (try rows.next()) |rows_item| {
@@ -426,6 +432,7 @@ test "exec multiple statement" {
         \\ INSERT INTO hello (name) VALUES ("world"), ("foo");
         \\ SELECT * FROM hello;
     );
+    defer rows.finalize() catch {};
 
     var rowIdx: usize = 0;
     while (try rows.next()) |rows_item| {
@@ -467,6 +474,7 @@ test "bind parameters" {
     try (try db.execBind("INSERT INTO hello (name) VALUES (?);", .{NAME2})).finish();
 
     var rows = db.exec("SELECT name FROM hello;");
+    defer rows.finalize() catch {};
     std.testing.expect((try rows.next()).?.Row.column(0).eql(&Type.text(NAME)));
     std.testing.expect((try rows.next()).?.Row.column(0).eql(&Type.text(NAME2)));
     std.testing.expect((try rows.next()).? == .Done);

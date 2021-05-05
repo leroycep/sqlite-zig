@@ -20,6 +20,7 @@ pub fn main() !void {
         \\ ;
         \\ SELECT id, username FROM users;
     );
+    defer rows.finalize() catch {};
 
     std.debug.warn(" {s}\t{s}\n", .{ "id", "username" });
     std.debug.warn(" {s}\t{s}\n", .{ "--", "--------" });
