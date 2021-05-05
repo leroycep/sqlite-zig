@@ -175,12 +175,20 @@ pub const SQLiteStmt = struct {
         return bytes[0..@intCast(usize, num_bytes)];
     }
 
+    pub fn bindInt(self: *const SQLiteStmt, paramIdx: c_int, number: i32) Error!void {
+        _ = try checkSqliteErr(sqlite3_bind_int(self.stmt, paramIdx, number));
+    }
+
     pub fn bindInt64(self: *const SQLiteStmt, paramIdx: c_int, number: i64) Error!void {
         _ = try checkSqliteErr(sqlite3_bind_int64(self.stmt, paramIdx, number));
     }
 
     pub fn bindText(self: *const SQLiteStmt, paramIdx: c_int, text: []const u8) Error!void {
         _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
+    }
+
+    pub fn bindBlob(self: *const SQLiteStmt, paramIdx: c_int, bytes: []const u8) Error!void {
+        _ = try checkSqliteErr(sqlite3_bind_blob(self.stmt, paramIdx, bytes.ptr, @intCast(c_int, bytes.len), ZIG_SQLITE_TRANSIENT));
     }
 
     pub fn finalize(self: *const SQLiteStmt) Error!void {
