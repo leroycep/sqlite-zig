@@ -2,7 +2,7 @@ const std = @import("std");
 const sqlite = @import("sqlite");
 
 pub fn main() !void {
-    const db = try sqlite.SQLite.open("simple.db");
+    const db = try sqlite.Db.open("simple.db");
     defer db.close() catch unreachable;
 
     var rows = db.exec(

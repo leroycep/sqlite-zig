@@ -41,7 +41,7 @@ const CMD_DELETE_POST = "delete";
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
 
-    const db = try sqlite.SQLite.open("blog.db");
+    const db = try sqlite.Db.open("blog.db");
     defer db.close() catch unreachable;
 
     // Create the posts table if it doesn't exist
@@ -115,7 +115,7 @@ pub fn main() !void {
     try read(stdout, &db, readOpts);
 }
 
-fn printSqliteErrMsg(db: *const sqlite.SQLite, e: sqlite.Error) !void {
+fn printSqliteErrMsg(db: *const sqlite.Db, e: sqlite.Error) !void {
     std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
     return e;
 }
@@ -133,9 +133,9 @@ const ReadOptions = struct {
     singlePost: ?GetPostBy = null,
 };
 
-fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
+fn read(out: anytype, db: *const sqlite.Db, opts: ReadOptions) !void {
     if (opts.singlePost) |post| {
-        var rows: sqlite.SQLiteRowsIterator = undefined;
+        var rows: sqlite.RowsIterator = undefined;
         switch (post) {
             .Id => |postId| rows = try db.execBind(SQL_GET_POST_BY_ID, .{postId}),
             .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
@@ -165,7 +165,7 @@ fn read(out: anytype, db: *const sqlite.SQLite, opts: ReadOptions) !void {
     }
 }
 
-fn displaySinglePost(out: anytype, row: *const sqlite.SQLiteRow) !void {
+fn displaySinglePost(out: anytype, row: *const sqlite.Row) !void {
     const id = row.columnInt64(0);
     const title = row.columnText(1);
     const content = row.columnText(2);
