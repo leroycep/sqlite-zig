@@ -12,7 +12,7 @@ pub fn bind(stmt: *const Stmt, comptime sql: [:0]const u8, args: anytype) Error!
     inline for (sql) |c| {
         if (c == '?') {
             const arg = args[nextArg];
-            comptime const argIdx = nextArg + 1;
+            const argIdx = nextArg + 1;
             try bindType(stmt, argIdx, arg);
             nextArg += 1;
         }
@@ -55,6 +55,6 @@ pub fn bindType(stmt: *const Stmt, comptime paramIdx: comptime_int, value: anyty
                 @compileError("Arrays of type " ++ @typeName(arr.child) ++ " are not supported.");
             }
         },
-        else => |typeInfo| @compileError("Binding type of " ++ @typeName(T) ++ " is not supported."),
+        else => @compileError("Binding type of " ++ @typeName(T) ++ " is not supported."),
     }
 }

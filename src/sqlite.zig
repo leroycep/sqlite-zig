@@ -1,5 +1,5 @@
 const std = @import("std");
-const panic = @import("builtin").panic;
+const panic = std.debug.panic;
 const Allocator = std.mem.Allocator;
 pub const errors = @import("error.zig");
 pub const Error = errors.Error;
@@ -7,24 +7,24 @@ pub const Success = errors.Success;
 pub const checkSqliteErr = errors.checkSqliteErr;
 const bind = @import("bind.zig");
 
-usingnamespace @import("c.zig");
+const c = @import("c.zig");
 
 /// Workaround Zig translate-c not being able to translate SQLITE_TRANSIENT into an actual value
 const S: isize = -1;
 const ZIG_SQLITE_TRANSIENT: fn (?*c_void) callconv(.C) void = @intToPtr(fn (?*c_void) callconv(.C) void, @bitCast(usize, S));
 
 pub const Db = struct {
-    db: *sqlite3,
+    db: *c.sqlite3,
 
     pub fn open(filename: [:0]const u8) Error!@This() {
-        var db: ?*sqlite3 = undefined;
+        var db: ?*c.sqlite3 = undefined;
 
-        var rc = sqlite3_open(filename, &db);
-        errdefer errors.assertOkay(sqlite3_close(db));
+        var rc = c.sqlite3_open(filename, &db);
+        errdefer errors.assertOkay(c.sqlite3_close(db));
 
         _ = try checkSqliteErr(rc);
 
-        var dbNonNull = db orelse panic("No error, sqlite db should not be null", null);
+        var dbNonNull = db orelse panic("No error, sqlite db should not be null", .{});
 
         return @This(){
             .db = dbNonNull,
@@ -41,30 +41,30 @@ pub const Db = struct {
     };
 
     pub fn openWithOptions(filename: [:0]const u8, options: OpenOptions) Error!@This() {
-        var db: ?*sqlite3 = undefined;
+        var db: ?*c.sqlite3 = undefined;
 
         var option_flags: c_int = switch (options.mode) {
-            .readonly => SQLITE_OPEN_READONLY,
-            .readwrite => SQLITE_OPEN_READWRITE,
-            .readwrite_create => SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+            .readonly => c.SQLITE_OPEN_READONLY,
+            .readwrite => c.SQLITE_OPEN_READWRITE,
+            .readwrite_create => c.SQLITE_OPEN_READWRITE | c.SQLITE_OPEN_CREATE,
         };
-        if (options.interpret_as_uri) option_flags |= SQLITE_OPEN_URI;
-        if (options.in_memory) option_flags |= SQLITE_OPEN_MEMORY;
+        if (options.interpret_as_uri) option_flags |= c.SQLITE_OPEN_URI;
+        if (options.in_memory) option_flags |= c.SQLITE_OPEN_MEMORY;
         if (options.threading) |threading| {
             option_flags |= @as(c_int, switch (threading) {
-                .no_mutex => SQLITE_OPEN_NOMUTEX,
-                .full_mutex => SQLITE_OPEN_FULLMUTEX,
+                .no_mutex => c.SQLITE_OPEN_NOMUTEX,
+                .full_mutex => c.SQLITE_OPEN_FULLMUTEX,
             });
         }
         if (options.cache) |cache| {
             option_flags |= @as(c_int, switch (cache) {
-                .shared => SQLITE_OPEN_SHAREDCACHE,
-                .private => SQLITE_OPEN_PRIVATECACHE,
+                .shared => c.SQLITE_OPEN_SHAREDCACHE,
+                .private => c.SQLITE_OPEN_PRIVATECACHE,
             });
         }
 
-        var rc = sqlite3_open_v2(filename, &db, option_flags, options.vfs_module orelse 0);
-        errdefer errors.assertOkay(sqlite3_close(db));
+        var rc = c.sqlite3_open_v2(filename, &db, option_flags, options.vfs_module orelse 0);
+        errdefer errors.assertOkay(c.sqlite3_close(db));
 
         _ = try checkSqliteErr(rc);
 
@@ -76,19 +76,19 @@ pub const Db = struct {
     }
 
     pub fn close(self: *const @This()) Error!void {
-        _ = try checkSqliteErr(sqlite3_close(self.db));
+        _ = try checkSqliteErr(c.sqlite3_close(self.db));
     }
 
     pub fn errmsg(self: *const @This()) ?[*:0]const u8 {
-        return sqlite3_errmsg(self.db);
+        return c.sqlite3_errmsg(self.db);
     }
 
     pub fn prepare(self: *const @This(), sql: [:0]const u8, sqlTail: ?*[:0]const u8) Error!?Stmt {
-        var stmt: ?*sqlite3_stmt = null;
+        var stmt: ?*c.sqlite3_stmt = null;
         const sqlLen = @intCast(c_int, sql.len + 1);
         var tail: ?[*]u8 = undefined;
 
-        var rc = sqlite3_prepare_v2(self.db, sql, sqlLen, &stmt, &tail);
+        var rc = c.sqlite3_prepare_v2(self.db, sql, sqlLen, &stmt, &tail);
 
         _ = try checkSqliteErr(rc);
 
@@ -120,23 +120,23 @@ pub const Db = struct {
 };
 
 pub const Stmt = struct {
-    stmt: *sqlite3_stmt,
+    stmt: *c.sqlite3_stmt,
 
     pub fn step(self: *const Stmt) Error!Success {
-        return try checkSqliteErr(sqlite3_step(self.stmt));
+        return try checkSqliteErr(c.sqlite3_step(self.stmt));
     }
 
     pub fn columnCount(self: *const Stmt) c_int {
-        return sqlite3_column_count(self.stmt);
+        return c.sqlite3_column_count(self.stmt);
     }
 
     pub fn columnType(self: *const Stmt, col: c_int) TypeTag {
-        switch (sqlite3_column_type(self.stmt, col)) {
-            SQLITE_INTEGER => return .Integer,
-            SQLITE_FLOAT => return .Float,
-            SQLITE_TEXT => return .Text,
-            SQLITE_BLOB => return .Blob,
-            SQLITE_NULL => return .Null,
+        switch (c.sqlite3_column_type(self.stmt, col)) {
+            c.SQLITE_INTEGER => return .Integer,
+            c.SQLITE_FLOAT => return .Float,
+            c.SQLITE_TEXT => return .Text,
+            c.SQLITE_BLOB => return .Blob,
+            c.SQLITE_NULL => return .Null,
             else => panic("Unexpected sqlite datatype", null),
         }
     }
@@ -152,47 +152,47 @@ pub const Stmt = struct {
     }
 
     pub fn columnInt(self: *const Stmt, col: c_int) i32 {
-        return sqlite3_column_int(self.stmt, col);
+        return c.sqlite3_column_int(self.stmt, col);
     }
 
     pub fn columnInt64(self: *const Stmt, col: c_int) i64 {
-        return sqlite3_column_int64(self.stmt, col);
+        return c.sqlite3_column_int64(self.stmt, col);
     }
 
     pub fn columnFloat(self: *const Stmt, col: c_int) f64 {
-        return sqlite3_column_double(self.stmt, col);
+        return c.sqlite3_column_double(self.stmt, col);
     }
 
     pub fn columnText(self: *const Stmt, col: c_int) []const u8 {
-        const num_bytes = sqlite3_column_bytes(self.stmt, col);
-        const bytes = sqlite3_column_text(self.stmt, col);
+        const num_bytes = c.sqlite3_column_bytes(self.stmt, col);
+        const bytes = c.sqlite3_column_text(self.stmt, col);
         return bytes[0..@intCast(usize, num_bytes)];
     }
 
     pub fn columnBlob(self: *const Stmt, col: c_int) []const u8 {
-        const num_bytes = sqlite3_column_bytes(self.stmt, col);
-        const bytes = @ptrCast([*]const u8, sqlite3_column_blob(self.stmt, col));
+        const num_bytes = c.sqlite3_column_bytes(self.stmt, col);
+        const bytes = @ptrCast([*]const u8, c.sqlite3_column_blob(self.stmt, col));
         return bytes[0..@intCast(usize, num_bytes)];
     }
 
     pub fn bindInt(self: *const Stmt, paramIdx: c_int, number: i32) Error!void {
-        _ = try checkSqliteErr(sqlite3_bind_int(self.stmt, paramIdx, number));
+        _ = try checkSqliteErr(c.sqlite3_bind_int(self.stmt, paramIdx, number));
     }
 
     pub fn bindInt64(self: *const Stmt, paramIdx: c_int, number: i64) Error!void {
-        _ = try checkSqliteErr(sqlite3_bind_int64(self.stmt, paramIdx, number));
+        _ = try checkSqliteErr(c.sqlite3_bind_int64(self.stmt, paramIdx, number));
     }
 
     pub fn bindText(self: *const Stmt, paramIdx: c_int, text: []const u8) Error!void {
-        _ = try checkSqliteErr(sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
+        _ = try checkSqliteErr(c.sqlite3_bind_text(self.stmt, paramIdx, text.ptr, @intCast(c_int, text.len), ZIG_SQLITE_TRANSIENT));
     }
 
     pub fn bindBlob(self: *const Stmt, paramIdx: c_int, bytes: []const u8) Error!void {
-        _ = try checkSqliteErr(sqlite3_bind_blob(self.stmt, paramIdx, bytes.ptr, @intCast(c_int, bytes.len), ZIG_SQLITE_TRANSIENT));
+        _ = try checkSqliteErr(c.sqlite3_bind_blob(self.stmt, paramIdx, bytes.ptr, @intCast(c_int, bytes.len), ZIG_SQLITE_TRANSIENT));
     }
 
     pub fn finalize(self: *const Stmt) Error!void {
-        _ = try checkSqliteErr(sqlite3_finalize(self.stmt));
+        _ = try checkSqliteErr(c.sqlite3_finalize(self.stmt));
     }
 };
 
@@ -304,7 +304,7 @@ pub const RowsIterator = struct {
     }
 
     pub fn finish(self: *@This()) !void {
-        while (try self.next()) |item| {}
+        while (try self.next()) |_| {}
     }
 
     fn finalizeStmt(self: *@This()) !void {
@@ -315,7 +315,7 @@ pub const RowsIterator = struct {
     }
 
     fn prepareNextStmt(self: *@This()) !void {
-        if (self.stmt) |stmt| {
+        if (self.stmt != null) {
             try self.finalizeStmt();
         }
         const curSql = self.remaingSql;
