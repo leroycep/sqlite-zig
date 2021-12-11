@@ -41,11 +41,11 @@ const CMD_DELETE_POST = "delete";
 pub fn main() !void {
     const alloc = std.heap.c_allocator;
 
-    const db = try sqlite.Db.open("blog.db");
+    const db = try sqlite.SQLite3.open("blog.db");
     defer db.close() catch unreachable;
 
     // Create the posts table if it doesn't exist
-    db.exec(SQL_CREATE_TABLE).finish() catch |e| return printSqliteErrMsg(&db, e);
+    db.exec(SQL_CREATE_TABLE, null, null, null) catch |e| return printSqliteErrMsg(db, e);
 
     // Get commandline arguments
     const args = try std.process.argsAlloc(alloc);
@@ -77,8 +77,14 @@ pub fn main() !void {
             return;
         }
 
-        var exec = try db.execBind(SQL_INSERT_POST, .{ args[2], args[3] });
-        try exec.finish();
+        var stmt = try db.prepare_v2(SQL_INSERT_POST, null);
+        try stmt.bindText(1, args[2], .static);
+        try stmt.bindText(2, args[2], .static);
+
+        std.debug.assert((try stmt.step()) == .Done);
+
+        try stmt.finalize();
+
         readOpts.singlePost = GetPostBy{ .LastInserted = {} };
     } else if (std.mem.eql(u8, args[1], CMD_UPDATE_POST)) {
         if (args.len != 5) {
@@ -92,8 +98,14 @@ pub fn main() !void {
         const title = args[3];
         const content = args[4];
 
-        var exec = try db.execBind(SQL_UPDATE_POST, .{ title, content, id });
-        try exec.finish();
+        var stmt = try db.prepare_v2(SQL_UPDATE_POST, null);
+        try stmt.bindText(1, title, .static);
+        try stmt.bindText(2, content, .static);
+        try stmt.bindInt64(3, id);
+
+        std.debug.assert((try stmt.step()) == .Done);
+
+        try stmt.finalize();
 
         readOpts.singlePost = GetPostBy{ .Id = id };
     } else if (std.mem.eql(u8, args[1], CMD_DELETE_POST)) {
@@ -106,16 +118,20 @@ pub fn main() !void {
             return error.NotAnInt;
         };
 
-        var exec = try db.execBind(SQL_DELETE_POST, .{id});
-        try exec.finish();
+        var stmt = try db.prepare_v2(SQL_DELETE_POST, null);
+        try stmt.bindInt64(3, id);
+
+        std.debug.assert((try stmt.step()) == .Done);
+
+        try stmt.finalize();
     }
 
     const stdout = &std.io.getStdOut().writer();
 
-    try read(stdout, &db, readOpts);
+    try read(stdout, db, readOpts);
 }
 
-fn printSqliteErrMsg(db: *const sqlite.Db, e: sqlite.Error) !void {
+fn printSqliteErrMsg(db: *sqlite.SQLite3, e: sqlite.Error) !void {
     std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
     return e;
 }
@@ -133,44 +149,45 @@ const ReadOptions = struct {
     singlePost: ?GetPostBy = null,
 };
 
-fn read(out: anytype, db: *const sqlite.Db, opts: ReadOptions) !void {
+fn read(out: anytype, db: *sqlite.SQLite3, opts: ReadOptions) !void {
     if (opts.singlePost) |post| {
-        var rows: sqlite.RowsIterator = undefined;
-        switch (post) {
-            .Id => |postId| rows = try db.execBind(SQL_GET_POST_BY_ID, .{postId}),
-            .LastInserted => rows = db.exec(SQL_GET_LAST_INSERTED),
-        }
-        defer rows.finalize() catch {};
-
-        const item = (try rows.next()) orelse {
-            std.debug.warn("No post with id '{}'\n", .{post});
-            return error.InvalidPostId;
+        const sql = switch (post) {
+            .Id => SQL_GET_POST_BY_ID,
+            .LastInserted => SQL_GET_LAST_INSERTED,
         };
-        try displaySinglePost(out, &item.Row);
 
-        try rows.finish();
+        var stmt = try db.prepare_v2(sql, null);
+        defer stmt.finalize() catch {};
+        if (post == .LastInserted) {
+            try stmt.bindInt64(1, post.Id);
+        }
+
+        switch (try stmt.step()) {
+            .Ok, .Row => {},
+            .Done => {
+                std.debug.warn("No post with id '{}'\n", .{post});
+                return error.InvalidPostId;
+            },
+        }
+        try displaySinglePost(out, stmt);
     } else {
-        var rows = db.exec(SQL_GET_POSTS);
-        defer rows.finalize() catch {};
+        var stmt = try db.prepare_v2(SQL_GET_POSTS, null);
+        defer stmt.finalize() catch {};
 
         try out.print("Posts:\n", .{});
-        while (try rows.next()) |row_item| {
-            const row = switch (row_item) {
-                .Row => |r| r,
-                .Done => continue,
-            };
-            const id = row.columnInt64(0);
-            const title = row.columnText(1);
-            const content = row.columnText(2);
+        while ((try stmt.step()) == .Row) {
+            const id = stmt.columnInt64(0);
+            const title = stmt.columnText(1);
+            const content = stmt.columnText(2);
             try out.print("\t{}\t{s}\t{s}\n", .{ id, title, content });
         }
     }
 }
 
-fn displaySinglePost(out: anytype, row: *const sqlite.Row) !void {
-    const id = row.columnInt64(0);
-    const title = row.columnText(1);
-    const content = row.columnText(2);
+fn displaySinglePost(out: anytype, stmt: *sqlite.Stmt) !void {
+    const id = stmt.columnInt64(0);
+    const title = stmt.columnText(1);
+    const content = stmt.columnText(2);
     try out.print(
         \\ Id: {}
         \\ Title: {s}

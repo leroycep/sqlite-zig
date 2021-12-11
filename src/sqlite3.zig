@@ -1,0 +1,359 @@
+const std = @import("std");
+const err = @import("./error.zig");
+const log = std.log.scoped(.sqlite3);
+
+pub const Error = err.Error;
+
+pub const SQLite3 = opaque {
+    // open
+    pub extern fn sqlite3_open([*:0]const u8, *?*SQLite3) c_int;
+    pub extern fn sqlite3_open16([*]const c_void, *?*SQLite3) c_int;
+    pub extern fn sqlite3_open_v2([*:0]const u8, *?*SQLite3, c_int, [*:0]const u8) c_int;
+
+    pub fn open(filename: [*:0]const u8) !*SQLite3 {
+        var db: ?*SQLite3 = null;
+        errdefer {
+            if (db) |db_not_null| {
+                log.debug("Freeing sqlite3 on error", .{});
+                db_not_null.close() catch unreachable;
+            }
+        }
+        _ = try err.checkSqliteErr(sqlite3_open(filename, &db));
+        return db.?;
+    }
+
+    pub fn open16(filename: [*:0]const u16) !*SQLite3 {
+        var db: ?*SQLite3 = null;
+        errdefer {
+            if (db) |db_not_null| {
+                log.debug("Freeing sqlite3 on error", .{});
+                db_not_null.close() catch unreachable;
+            }
+        }
+        _ = try err.checkSqliteErr(sqlite3_open(filename, &db));
+        return db.?;
+    }
+
+    pub const OpenV2Flags = struct {
+        readonly: bool = false,
+        readwrite: bool = false,
+        create: bool = false,
+        uri: bool = false,
+        memory: bool = false,
+        nomutex: bool = false,
+        fullmutex: bool = false,
+        sharedcache: bool = false,
+        privatecache: bool = false,
+        exrescode: bool = false,
+        nofollow: bool = false,
+    };
+
+    pub fn open_v2(filename: [*:0]const u8, flags: OpenV2Flags, zVfs: [*:0]const u8) !*SQLite3 {
+        var db: ?*SQLite3 = null;
+        errdefer {
+            if (db) |db_not_null| {
+                log.debug("Freeing SQLite3 on error", .{});
+                db_not_null.close() catch unreachable;
+            }
+        }
+
+        var c_flags: c_int = 0;
+        if (flags.readonly) c_flags |= SQLITE_OPEN_READONLY;
+        if (flags.readwrite) c_flags |= SQLITE_OPEN_READWRITE;
+        if (flags.create) c_flags |= SQLITE_OPEN_CREATE;
+        if (flags.uri) c_flags |= SQLITE_OPEN_URI;
+        if (flags.memory) c_flags |= SQLITE_OPEN_MEMORY;
+        if (flags.nomutex) c_flags |= SQLITE_OPEN_NOMUTEX;
+        if (flags.fullmutex) c_flags |= SQLITE_OPEN_FULLMUTEX;
+        if (flags.sharedcache) c_flags |= SQLITE_OPEN_SHAREDCACHE;
+        if (flags.privatecache) c_flags |= SQLITE_OPEN_PRIVATECACHE;
+        if (flags.exrescode) c_flags |= SQLITE_OPEN_EXRESCODE;
+        if (flags.nofollow) c_flags |= SQLITE_OPEN_NOFOLLOW;
+
+        _ = try err.checkSqliteErr(sqlite3_open_v2(filename, &db, c_flags, zVfs));
+        return db.?;
+    }
+
+    // close
+    pub extern fn sqlite3_close(?*SQLite3) c_int;
+    pub extern fn sqlite3_close_v2(?*SQLite3) c_int;
+    pub fn close(this: *@This()) !void {
+        _ = try err.checkSqliteErr(sqlite3_close(this));
+    }
+
+    pub fn close_v2(this: *@This()) !void {
+        _ = try err.checkSqliteErr(sqlite3_close_v2(this));
+    }
+
+    // Error messages
+    // TODO: Can the returned strings be null?
+    pub extern fn sqlite3_errcode(*SQLite3) c_int;
+    pub extern fn sqlite3_extended_errcode(*SQLite3) c_int;
+    pub extern fn sqlite3_errmsg(*SQLite3) ?[*:0]const u8;
+    pub extern fn sqlite3_errmsg16(*SQLite3) ?*const c_void;
+
+    pub fn errmsg(this: *@This()) [:0]const u8 {
+        return std.mem.span(sqlite3_errmsg(this) orelse return "");
+    }
+
+    // exec
+    pub const ExecCallback = fn (userdata: ?*c_void, number_of_result_columns: c_int, columnsAsText: [*]?[*:0]u8, columnNames: [*]?[*:0]u8) callconv(.C) c_int;
+    pub extern fn sqlite3_exec(*SQLite3, sql: [*:0]const u8, callback: ?ExecCallback, ?*c_void, pErrmsg: ?*[*:0]u8) c_int;
+
+    pub fn exec(this: *@This(), sql: [*:0]const u8, callback: ?ExecCallback, userdata: ?*c_void, pErrmsg: ?*[*:0]u8) !void {
+        _ = try err.checkSqliteErr(sqlite3_exec(this, sql, callback, userdata, pErrmsg));
+    }
+
+    // prepare
+    pub extern fn sqlite3_prepare(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
+    pub extern fn sqlite3_prepare_v2(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
+
+    pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[]const u8) !*Stmt {
+        //var sql_tail_buf: [*:0]const u8 = undefined;
+        var sql_tail_ptr: ?*[*]const u8 = if (sqlTailOpt) |sqlTail| &sqlTail.ptr else null;
+
+        var pp_stmt: ?*Stmt = null;
+        errdefer _ = Stmt.sqlite3_finalize(pp_stmt);
+        _ = try err.checkSqliteErr(sqlite3_prepare_v2(this, sql.ptr, @intCast(c_int, sql.len), &pp_stmt, sql_tail_ptr));
+
+        if (sqlTailOpt) |sqlTail| {
+            const diff = @ptrToInt(sqlTail.ptr) -| @ptrToInt(sql.ptr);
+            sqlTail.len = sql.len - diff;
+        }
+
+        return pp_stmt.?;
+    }
+};
+
+pub const Stmt = opaque {
+    // finalize
+    pub extern fn sqlite3_finalize(?*Stmt) c_int;
+    pub fn finalize(this: *@This()) !void {
+        _ = try err.checkSqliteErr(sqlite3_finalize(this));
+    }
+
+    // step
+    pub extern fn sqlite3_step(*Stmt) c_int;
+    pub fn step(this: *@This()) !err.Success {
+        return try err.checkSqliteErr(sqlite3_step(this));
+    }
+
+    // column
+    pub extern fn sqlite3_column_blob(*Stmt, iCol: c_int) ?*const c_void;
+    pub extern fn sqlite3_column_double(*Stmt, iCol: c_int) f64;
+    pub extern fn sqlite3_column_int(*Stmt, iCol: c_int) c_int;
+    pub extern fn sqlite3_column_int64(*Stmt, iCol: c_int) i64;
+    pub extern fn sqlite3_column_text(*Stmt, iCol: c_int) [*:0]const u8;
+    pub extern fn sqlite3_column_text16(*Stmt, iCol: c_int) *const c_void;
+    //pub extern fn sqlite3_column_value(*Stmt, iCol: c_int) ?*Value;
+
+    pub extern fn sqlite3_column_bytes(*Stmt, iCol: c_int) c_int;
+    pub extern fn sqlite3_column_bytes16(*Stmt, iCol: c_int) c_int;
+    pub extern fn sqlite3_column_type(*Stmt, iCol: c_int) c_int;
+
+    pub fn columnBlob(this: *@This(), iCol: c_int) ?[]const u8 {
+        const blob_ptr = sqlite3_column_blob(this, iCol) orelse return null;
+        const blob_len = sqlite3_column_bytes(this, iCol);
+        return @ptrCast([*]const u8, blob_ptr)[0..blob_len];
+    }
+
+    pub fn columnInt(this: *@This(), iCol: c_int) c_int {
+        return sqlite3_column_int(this, iCol);
+    }
+
+    pub fn columnInt64(this: *@This(), iCol: c_int) i64 {
+        return sqlite3_column_int64(this, iCol);
+    }
+
+    pub fn columnText(this: *@This(), iCol: c_int) [:0]const u8 {
+        const text_ptr = sqlite3_column_text(this, iCol);
+        const text_len = sqlite3_column_bytes(this, iCol);
+        return text_ptr[0..@intCast(usize, text_len) :0];
+    }
+
+    pub fn columnText16(this: *@This(), iCol: c_int) [:0]const u16 {
+        const text_ptr = sqlite3_column_text(this, iCol);
+        const text_len = sqlite3_column_bytes16(this, iCol) / @sizeOf(u16);
+        return text_ptr[0..@intCast(usize, text_len) :0];
+    }
+
+    // TODO: Supprt columnValue as well (it has a bunch of caveats listed, focus on it later)
+    pub const columnBytes = sqlite3_column_bytes;
+    pub const columnBytes16 = sqlite3_column_bytes16;
+
+    pub fn columnType(this: *@This(), iCol: c_int) SQLiteType {
+        return @intToEnum(SQLiteType, sqlite3_column_type(this, iCol));
+    }
+
+    // bind
+    pub extern fn sqlite3_bind_blob(*Stmt, iCol: c_int, value: ?[*]const c_void, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_blob64(*Stmt, iCol: c_int, value: ?[*]const c_void, len: u64, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_double(*Stmt, iCol: c_int, value: f64) c_int;
+    pub extern fn sqlite3_bind_int(*Stmt, iCol: c_int, value: c_int) c_int;
+    pub extern fn sqlite3_bind_int64(*Stmt, iCol: c_int, value: i64) c_int;
+    pub extern fn sqlite3_bind_null(*Stmt, iCol: c_int) c_int;
+    pub extern fn sqlite3_bind_text(*Stmt, iCol: c_int, value: ?[*]const u8, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_text16(*Stmt, iCol: c_int, value: ?[*]const c_void, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_text64(*Stmt, iCol: c_int, value: ?[*]const u8, len: u64, ?DestructorFn, encoding: u8) c_int;
+    // TODO: pub extern fn sqlite3_bind_value(*Stmt, iCol: c_int, value: *const Value) c_int;
+    pub extern fn sqlite3_bind_pointer(*Stmt, iCol: c_int, value: *c_void, name: [*:0]const u8, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_zeroblob(*Stmt, iCol: c_int, len: c_int) c_int;
+    pub extern fn sqlite3_bind_zeroblob64(*Stmt, iCol: c_int, len: u64) c_int;
+
+    pub fn bindBlob(this: *@This(), iCol: c_int, value: ?[]const u8, destructorType: DestructorType) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_blob64(
+            this,
+            iCol,
+            if (value) |v| v.ptr else null,
+            if (value) |v| @intCast(u64, v.len) else 0,
+            destructorType.getFnValue(),
+        ));
+    }
+
+    pub fn bindDouble(this: *@This(), iCol: c_int, value: f64) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_double(this, iCol, value));
+    }
+
+    pub fn bindInt(this: *@This(), iCol: c_int, value: c_int) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_int(this, iCol, value));
+    }
+
+    pub fn bindInt64(this: *@This(), iCol: c_int, value: i64) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_int64(this, iCol, value));
+    }
+
+    pub fn bindNull(this: *@This(), iCol: c_int) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_null(this, iCol));
+    }
+
+    pub fn bindText(this: *@This(), iCol: c_int, value: ?[]const u8, destructorType: DestructorType) !void {
+        if (value) |v| std.debug.assert(v.len <= std.math.maxInt(c_int));
+
+        _ = try err.checkSqliteErr(sqlite3_bind_text(
+            this,
+            iCol,
+            if (value) |v| v.ptr else null,
+            if (value) |v| @intCast(c_int, v.len) else 0,
+            destructorType.getFnValue(),
+        ));
+    }
+
+    pub fn bindText16(this: *@This(), iCol: c_int, value: ?[]const u16, destructorType: DestructorType) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_text16(
+            this,
+            iCol,
+            if (value) |v| v.ptr else null,
+            if (value) |v| v.len * @sizeOf(u16) else 0,
+            destructorType.getFnValue(),
+        ));
+    }
+
+    pub fn bindText64(this: *@This(), iCol: c_int, value: ?[]const u8, destructorType: DestructorType, encoding: TextEncoding) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_text64(
+            this,
+            iCol,
+            if (value) |v| v.ptr else null,
+            if (value) |v| v.len else 0,
+            destructorType.getFnValue(),
+            @enumToInt(encoding),
+        ));
+    }
+
+    // TODO: pub fn bindValue()
+
+    pub fn bindPointer(this: *@This(), iCol: c_int, value: ?*c_void, name: [*:0]const u8, destructorFn: ?DestructorFn) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_pointer(
+            this,
+            iCol,
+            value,
+            name,
+            destructorFn,
+        ));
+    }
+
+    pub fn bindZeroBlob(this: *@This(), iCol: c_int, len: c_int) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_zeroblob(this, iCol, len));
+    }
+
+    pub fn bindZeroblob64(this: *@This(), iCol: c_int, len: u64) !void {
+        _ = try err.checkSqliteErr(sqlite3_bind_zeroblob64(this, iCol, len));
+    }
+};
+
+pub extern fn sqlite3_errstr(c_int) ?[*:0]const u8;
+pub fn errstr(errcode: c_int) [:0]const u8 {
+    return std.mem.span(sqlite3_errstr(errcode));
+}
+
+pub const SQLiteType = enum(c_int) {
+    integer = 1,
+    float = 2,
+    text = 3,
+    blob = 4,
+    @"null" = 5,
+};
+
+pub const DestructorFn = fn (*c_void) callconv(.C) void;
+
+pub const DestructorType = union(enum) {
+    destructor: DestructorFn,
+    static: void,
+    transient: void,
+
+    fn getFnValue(this: @This()) ?DestructorFn {
+        return switch (this) {
+            .destructor => |d| d,
+            .static => @intToPtr(?DestructorFn, 0),
+            .transient => @intToPtr(?DestructorFn, 0),
+        };
+    }
+};
+
+pub const TextEncoding = enum(u8) {
+    utf8 = 1,
+    utf16LE = 2,
+    utf16BE = 3,
+    utf16 = 4,
+};
+
+// TODO: Add Value opaque
+
+// Memory allocation
+pub extern fn sqlite3_malloc(len: c_int) ?*c_void;
+pub extern fn sqlite3_malloc64(len: u64) ?*c_void;
+pub extern fn sqlite3_realloc(ptr: ?*c_void, len: c_int) ?*c_void;
+pub extern fn sqlite3_realloc64(ptr: ?*c_void, len: u64) ?*c_void;
+pub extern fn sqlite3_free(ptr: ?*c_void) void;
+pub extern fn sqlite3_msize(ptr: ?*c_void) u64;
+
+pub const malloc = sqlite3_malloc;
+pub const malloc64 = sqlite3_malloc64;
+pub const realloc = sqlite3_realloc;
+pub const realloc64 = sqlite3_realloc64;
+pub const free = sqlite3_free;
+pub const msize = sqlite3_msize;
+
+// Constants
+pub const SQLITE_OPEN_READONLY = @as(c_int, 0x00000001);
+pub const SQLITE_OPEN_READWRITE = @as(c_int, 0x00000002);
+pub const SQLITE_OPEN_CREATE = @as(c_int, 0x00000004);
+pub const SQLITE_OPEN_DELETEONCLOSE = @as(c_int, 0x00000008);
+pub const SQLITE_OPEN_EXCLUSIVE = @as(c_int, 0x00000010);
+pub const SQLITE_OPEN_AUTOPROXY = @as(c_int, 0x00000020);
+pub const SQLITE_OPEN_URI = @as(c_int, 0x00000040);
+pub const SQLITE_OPEN_MEMORY = @as(c_int, 0x00000080);
+pub const SQLITE_OPEN_MAIN_DB = @as(c_int, 0x00000100);
+pub const SQLITE_OPEN_TEMP_DB = @as(c_int, 0x00000200);
+pub const SQLITE_OPEN_TRANSIENT_DB = @as(c_int, 0x00000400);
+pub const SQLITE_OPEN_MAIN_JOURNAL = @as(c_int, 0x00000800);
+pub const SQLITE_OPEN_TEMP_JOURNAL = @as(c_int, 0x00001000);
+pub const SQLITE_OPEN_SUBJOURNAL = @as(c_int, 0x00002000);
+pub const SQLITE_OPEN_SUPER_JOURNAL = @as(c_int, 0x00004000);
+pub const SQLITE_OPEN_NOMUTEX = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x00008000, .hexadecimal);
+pub const SQLITE_OPEN_FULLMUTEX = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x00010000, .hexadecimal);
+pub const SQLITE_OPEN_SHAREDCACHE = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x00020000, .hexadecimal);
+pub const SQLITE_OPEN_PRIVATECACHE = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x00040000, .hexadecimal);
+pub const SQLITE_OPEN_WAL = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x00080000, .hexadecimal);
+pub const SQLITE_OPEN_NOFOLLOW = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x01000000, .hexadecimal);
+pub const SQLITE_OPEN_EXRESCODE = @import("std").zig.c_translation.promoteIntLiteral(c_int, 0x02000000, .hexadecimal);
+pub const SQLITE_OPEN_MASTER_JOURNAL = @as(c_int, 0x00004000);
