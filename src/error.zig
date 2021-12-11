@@ -2,8 +2,6 @@ const std = @import("std");
 const panic = std.debug.panic;
 const log = std.log.scoped(.sqlite3);
 
-const c = @import("cimport.zig");
-
 pub const Success = enum {
     Ok,
     Done,
@@ -114,9 +112,9 @@ pub const SQLITE_DONE = @as(c_int, 101);
 
 pub fn successFromCode(rc: c_int) ?Success {
     return switch (rc) {
-        c.SQLITE_OK => .Ok,
-        c.SQLITE_DONE => .Done,
-        c.SQLITE_ROW => .Row,
+        SQLITE_OK => .Ok,
+        SQLITE_DONE => .Done,
+        SQLITE_ROW => .Row,
         else => null,
     };
 }
@@ -340,7 +338,7 @@ pub fn checkSqliteErr(rc: c_int) Error!Success {
 }
 
 pub fn assertOkay(sqlite_rc: c_int) void {
-    if (sqlite_rc != c.SQLITE_OK) {
+    if (sqlite_rc != SQLITE_OK) {
         panic("SQLite returned an error code", .{});
     }
 }
