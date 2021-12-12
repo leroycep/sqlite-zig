@@ -418,7 +418,7 @@ pub const ConfigParams = union(ConfigOption) {
     pcache2: *PCache.Methods2,
     getpcache2: *PCache.Methods2,
     log: struct {
-        logFn: fn (userdata: *c_void, errcode: c_int, msg: ?[*]const u8) callconv(.C) void,
+        logFn: fn (userdata: *c_void, errcode: c_int, msg: ?[*:0]const u8) callconv(.C) void,
         userdata: ?*c_void,
     },
     uri: bool,
