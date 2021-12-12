@@ -154,7 +154,7 @@ pub const Stmt = opaque {
     pub fn columnBlob(this: *@This(), iCol: c_int) ?[]const u8 {
         const blob_ptr = sqlite3_column_blob(this, iCol) orelse return null;
         const blob_len = sqlite3_column_bytes(this, iCol);
-        return @ptrCast([*]const u8, blob_ptr)[0..blob_len];
+        return @ptrCast([*]const u8, blob_ptr)[0..@intCast(usize, blob_len)];
     }
 
     pub fn columnInt(this: *@This(), iCol: c_int) c_int {
@@ -186,14 +186,14 @@ pub const Stmt = opaque {
     }
 
     // bind
-    pub extern fn sqlite3_bind_blob(*Stmt, iCol: c_int, value: ?[*]const c_void, len: c_int, ?DestructorFn) c_int;
-    pub extern fn sqlite3_bind_blob64(*Stmt, iCol: c_int, value: ?[*]const c_void, len: u64, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_blob(*Stmt, iCol: c_int, value: ?*const c_void, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_blob64(*Stmt, iCol: c_int, value: ?*const c_void, len: u64, ?DestructorFn) c_int;
     pub extern fn sqlite3_bind_double(*Stmt, iCol: c_int, value: f64) c_int;
     pub extern fn sqlite3_bind_int(*Stmt, iCol: c_int, value: c_int) c_int;
     pub extern fn sqlite3_bind_int64(*Stmt, iCol: c_int, value: i64) c_int;
     pub extern fn sqlite3_bind_null(*Stmt, iCol: c_int) c_int;
     pub extern fn sqlite3_bind_text(*Stmt, iCol: c_int, value: ?[*]const u8, len: c_int, ?DestructorFn) c_int;
-    pub extern fn sqlite3_bind_text16(*Stmt, iCol: c_int, value: ?[*]const c_void, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_text16(*Stmt, iCol: c_int, value: ?*const c_void, len: c_int, ?DestructorFn) c_int;
     pub extern fn sqlite3_bind_text64(*Stmt, iCol: c_int, value: ?[*]const u8, len: u64, ?DestructorFn, encoding: u8) c_int;
     // TODO: pub extern fn sqlite3_bind_value(*Stmt, iCol: c_int, value: *const Value) c_int;
     pub extern fn sqlite3_bind_pointer(*Stmt, iCol: c_int, value: *c_void, name: [*:0]const u8, ?DestructorFn) c_int;
