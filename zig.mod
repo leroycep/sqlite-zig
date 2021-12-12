@@ -8,4 +8,3 @@ c_source_files:
 c_include_dirs:
  - dep/sqlite
 dependencies:
-- src: system_lib sqlite3
