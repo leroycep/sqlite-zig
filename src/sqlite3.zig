@@ -281,6 +281,15 @@ pub const Stmt = opaque {
     pub fn bindZeroblob64(this: *@This(), iCol: c_int, len: u64) !void {
         _ = try err.checkSqliteErr(sqlite3_bind_zeroblob64(this, iCol, len));
     }
+
+    // Stmt introspection
+    pub extern fn sqlite3_bind_parameter_index(*Stmt, name: [*:0]const u8) c_int;
+
+    pub fn bindParameterIndex(this: *@This(), name: [:0]const u8) ?c_int {
+        const ret = this.sqlite3_bind_parameter_index(name.ptr);
+        if (ret == 0) return null;
+        return ret;
+    }
 };
 
 pub extern fn sqlite3_errstr(c_int) ?[*:0]const u8;
