@@ -126,13 +126,16 @@ pub const SQLite3 = opaque {
 };
 
 pub const Stmt = opaque {
-    // finalize
+    pub extern fn sqlite3_reset(*Stmt) c_int;
+    pub fn reset(this: *@This()) !void {
+        _ = try err.checkSqliteErr(this.sqlite3_reset());
+    }
+
     pub extern fn sqlite3_finalize(?*Stmt) c_int;
     pub fn finalize(this: *@This()) !void {
         _ = try err.checkSqliteErr(sqlite3_finalize(this));
     }
 
-    // step
     pub extern fn sqlite3_step(*Stmt) c_int;
     pub fn step(this: *@This()) !err.Success {
         return try err.checkSqliteErr(sqlite3_step(this));
