@@ -7,7 +7,7 @@ pub const Error = err.Error;
 pub const SQLite3 = opaque {
     // open
     pub extern fn sqlite3_open([*:0]const u8, *?*SQLite3) c_int;
-    pub extern fn sqlite3_open16([*]const c_void, *?*SQLite3) c_int;
+    pub extern fn sqlite3_open16([*]const anyopaque, *?*SQLite3) c_int;
     pub extern fn sqlite3_open_v2([*:0]const u8, *?*SQLite3, c_int, [*:0]const u8) c_int;
 
     pub fn open(filename: [*:0]const u8) !*SQLite3 {
@@ -90,17 +90,17 @@ pub const SQLite3 = opaque {
     pub extern fn sqlite3_errcode(*SQLite3) c_int;
     pub extern fn sqlite3_extended_errcode(*SQLite3) c_int;
     pub extern fn sqlite3_errmsg(*SQLite3) ?[*:0]const u8;
-    pub extern fn sqlite3_errmsg16(*SQLite3) ?*const c_void;
+    pub extern fn sqlite3_errmsg16(*SQLite3) ?*const anyopaque;
 
     pub fn errmsg(this: *@This()) [:0]const u8 {
         return std.mem.span(sqlite3_errmsg(this) orelse return "");
     }
 
     // exec
-    pub const ExecCallback = fn (userdata: ?*c_void, number_of_result_columns: c_int, columnsAsText: [*]?[*:0]u8, columnNames: [*]?[*:0]u8) callconv(.C) c_int;
-    pub extern fn sqlite3_exec(*SQLite3, sql: [*:0]const u8, callback: ?ExecCallback, ?*c_void, pErrmsg: ?*[*:0]u8) c_int;
+    pub const ExecCallback = fn (userdata: ?*anyopaque, number_of_result_columns: c_int, columnsAsText: [*]?[*:0]u8, columnNames: [*]?[*:0]u8) callconv(.C) c_int;
+    pub extern fn sqlite3_exec(*SQLite3, sql: [*:0]const u8, callback: ?ExecCallback, ?*anyopaque, pErrmsg: ?*[*:0]u8) c_int;
 
-    pub fn exec(this: *@This(), sql: [*:0]const u8, callback: ?ExecCallback, userdata: ?*c_void, pErrmsg: ?*[*:0]u8) !void {
+    pub fn exec(this: *@This(), sql: [*:0]const u8, callback: ?ExecCallback, userdata: ?*anyopaque, pErrmsg: ?*[*:0]u8) !void {
         _ = try err.checkSqliteErr(sqlite3_exec(this, sql, callback, userdata, pErrmsg));
     }
 
@@ -139,12 +139,12 @@ pub const Stmt = opaque {
     }
 
     // column
-    pub extern fn sqlite3_column_blob(*Stmt, iCol: c_int) ?*const c_void;
+    pub extern fn sqlite3_column_blob(*Stmt, iCol: c_int) ?*const anyopaque;
     pub extern fn sqlite3_column_double(*Stmt, iCol: c_int) f64;
     pub extern fn sqlite3_column_int(*Stmt, iCol: c_int) c_int;
     pub extern fn sqlite3_column_int64(*Stmt, iCol: c_int) i64;
     pub extern fn sqlite3_column_text(*Stmt, iCol: c_int) [*:0]const u8;
-    pub extern fn sqlite3_column_text16(*Stmt, iCol: c_int) *const c_void;
+    pub extern fn sqlite3_column_text16(*Stmt, iCol: c_int) *const anyopaque;
     //pub extern fn sqlite3_column_value(*Stmt, iCol: c_int) ?*Value;
 
     pub extern fn sqlite3_column_bytes(*Stmt, iCol: c_int) c_int;
@@ -186,17 +186,17 @@ pub const Stmt = opaque {
     }
 
     // bind
-    pub extern fn sqlite3_bind_blob(*Stmt, iCol: c_int, value: ?*const c_void, len: c_int, ?DestructorFn) c_int;
-    pub extern fn sqlite3_bind_blob64(*Stmt, iCol: c_int, value: ?*const c_void, len: u64, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_blob(*Stmt, iCol: c_int, value: ?*const anyopaque, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_blob64(*Stmt, iCol: c_int, value: ?*const anyopaque, len: u64, ?DestructorFn) c_int;
     pub extern fn sqlite3_bind_double(*Stmt, iCol: c_int, value: f64) c_int;
     pub extern fn sqlite3_bind_int(*Stmt, iCol: c_int, value: c_int) c_int;
     pub extern fn sqlite3_bind_int64(*Stmt, iCol: c_int, value: i64) c_int;
     pub extern fn sqlite3_bind_null(*Stmt, iCol: c_int) c_int;
     pub extern fn sqlite3_bind_text(*Stmt, iCol: c_int, value: ?[*]const u8, len: c_int, ?DestructorFn) c_int;
-    pub extern fn sqlite3_bind_text16(*Stmt, iCol: c_int, value: ?*const c_void, len: c_int, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_text16(*Stmt, iCol: c_int, value: ?*const anyopaque, len: c_int, ?DestructorFn) c_int;
     pub extern fn sqlite3_bind_text64(*Stmt, iCol: c_int, value: ?[*]const u8, len: u64, ?DestructorFn, encoding: u8) c_int;
     // TODO: pub extern fn sqlite3_bind_value(*Stmt, iCol: c_int, value: *const Value) c_int;
-    pub extern fn sqlite3_bind_pointer(*Stmt, iCol: c_int, value: *c_void, name: [*:0]const u8, ?DestructorFn) c_int;
+    pub extern fn sqlite3_bind_pointer(*Stmt, iCol: c_int, value: *anyopaque, name: [*:0]const u8, ?DestructorFn) c_int;
     pub extern fn sqlite3_bind_zeroblob(*Stmt, iCol: c_int, len: c_int) c_int;
     pub extern fn sqlite3_bind_zeroblob64(*Stmt, iCol: c_int, len: u64) c_int;
 
@@ -261,7 +261,7 @@ pub const Stmt = opaque {
 
     // TODO: pub fn bindValue()
 
-    pub fn bindPointer(this: *@This(), iCol: c_int, value: ?*c_void, name: [*:0]const u8, destructorFn: ?DestructorFn) !void {
+    pub fn bindPointer(this: *@This(), iCol: c_int, value: ?*anyopaque, name: [*:0]const u8, destructorFn: ?DestructorFn) !void {
         _ = try err.checkSqliteErr(sqlite3_bind_pointer(
             this,
             iCol,
@@ -293,7 +293,7 @@ pub const SQLiteType = enum(c_int) {
     @"null" = 5,
 };
 
-pub const DestructorFn = fn (*c_void) callconv(.C) void;
+pub const DestructorFn = fn (*anyopaque) callconv(.C) void;
 
 pub const DestructorType = union(enum) {
     destructor: DestructorFn,
@@ -319,12 +319,12 @@ pub const TextEncoding = enum(u8) {
 // TODO: Add Value opaque
 
 // Memory allocation
-pub extern fn sqlite3_malloc(len: c_int) ?*c_void;
-pub extern fn sqlite3_malloc64(len: u64) ?*c_void;
-pub extern fn sqlite3_realloc(ptr: ?*c_void, len: c_int) ?*c_void;
-pub extern fn sqlite3_realloc64(ptr: ?*c_void, len: u64) ?*c_void;
-pub extern fn sqlite3_free(ptr: ?*c_void) void;
-pub extern fn sqlite3_msize(ptr: ?*c_void) u64;
+pub extern fn sqlite3_malloc(len: c_int) ?*anyopaque;
+pub extern fn sqlite3_malloc64(len: u64) ?*anyopaque;
+pub extern fn sqlite3_realloc(ptr: ?*anyopaque, len: c_int) ?*anyopaque;
+pub extern fn sqlite3_realloc64(ptr: ?*anyopaque, len: u64) ?*anyopaque;
+pub extern fn sqlite3_free(ptr: ?*anyopaque) void;
+pub extern fn sqlite3_msize(ptr: ?*anyopaque) u64;
 
 pub const malloc = sqlite3_malloc;
 pub const malloc64 = sqlite3_malloc64;
@@ -418,14 +418,14 @@ pub const ConfigParams = union(ConfigOption) {
     pcache2: *PCache.Methods2,
     getpcache2: *PCache.Methods2,
     log: struct {
-        logFn: fn (userdata: *c_void, errcode: c_int, msg: ?[*:0]const u8) callconv(.C) void,
-        userdata: ?*c_void,
+        logFn: fn (userdata: *anyopaque, errcode: c_int, msg: ?[*:0]const u8) callconv(.C) void,
+        userdata: ?*anyopaque,
     },
     uri: bool,
     covering_index_scan: bool,
     sqllog: struct {
-        logFn: fn (userdata: *c_void, db: *SQLite3, dbFilename: ?[*:0]const u8, sqllog: c_int) callconv(.C) void,
-        userdata: ?*c_void,
+        logFn: fn (userdata: *anyopaque, db: *SQLite3, dbFilename: ?[*:0]const u8, sqllog: c_int) callconv(.C) void,
+        userdata: ?*anyopaque,
     },
     mmap_size: struct {
         defaultSizeLimit: i64,
@@ -497,14 +497,14 @@ pub const SQLITE_CONFIG_SORTERREF_SIZE = @as(c_int, 28);
 pub const SQLITE_CONFIG_MEMDB_MAXSIZE = @as(c_int, 29);
 
 pub const sqlite3_mem_methods = extern struct {
-    xMalloc: ?fn (c_int) callconv(.C) ?*c_void,
-    xFree: ?fn (?*c_void) callconv(.C) void,
-    xRealloc: ?fn (?*c_void, c_int) callconv(.C) ?*c_void,
-    xSize: ?fn (?*c_void) callconv(.C) c_int,
+    xMalloc: ?fn (c_int) callconv(.C) ?*anyopaque,
+    xFree: ?fn (?*anyopaque) callconv(.C) void,
+    xRealloc: ?fn (?*anyopaque, c_int) callconv(.C) ?*anyopaque,
+    xSize: ?fn (?*anyopaque) callconv(.C) c_int,
     xRoundup: ?fn (c_int) callconv(.C) c_int,
-    xInit: ?fn (?*c_void) callconv(.C) c_int,
-    xShutdown: ?fn (?*c_void) callconv(.C) void,
-    pAppData: ?*c_void,
+    xInit: ?fn (?*anyopaque) callconv(.C) c_int,
+    xShutdown: ?fn (?*anyopaque) callconv(.C) void,
+    pAppData: ?*anyopaque,
 };
 
 // Mutex
@@ -525,15 +525,15 @@ pub const Mutex = opaque {
 // PCache
 pub const PCache = opaque {
     pub const Page = extern struct {
-        pBuf: ?*c_void,
-        pExtra: ?*c_void,
+        pBuf: ?*anyopaque,
+        pExtra: ?*anyopaque,
     };
 
     pub const Methods2 = extern struct {
         iVersion: c_int,
-        pArg: ?*c_void,
-        xInit: ?fn (?*c_void) callconv(.C) c_int,
-        xShutdown: ?fn (?*c_void) callconv(.C) void,
+        pArg: ?*anyopaque,
+        xInit: ?fn (?*anyopaque) callconv(.C) c_int,
+        xShutdown: ?fn (?*anyopaque) callconv(.C) void,
         xCreate: ?fn (c_int, c_int, c_int) callconv(.C) ?*PCache,
         xCachesize: ?fn (?*PCache, c_int) callconv(.C) void,
         xPagecount: ?fn (?*PCache) callconv(.C) c_int,
@@ -546,15 +546,15 @@ pub const PCache = opaque {
     };
 
     pub const Methods = extern struct {
-        pArg: ?*c_void,
-        xInit: ?fn (?*c_void) callconv(.C) c_int,
-        xShutdown: ?fn (?*c_void) callconv(.C) void,
+        pArg: ?*anyopaque,
+        xInit: ?fn (?*anyopaque) callconv(.C) c_int,
+        xShutdown: ?fn (?*anyopaque) callconv(.C) void,
         xCreate: ?fn (c_int, c_int) callconv(.C) ?*PCache,
         xCachesize: ?fn (?*PCache, c_int) callconv(.C) void,
         xPagecount: ?fn (?*PCache) callconv(.C) c_int,
-        xFetch: ?fn (?*PCache, c_uint, c_int) callconv(.C) ?*c_void,
-        xUnpin: ?fn (?*PCache, ?*c_void, c_int) callconv(.C) void,
-        xRekey: ?fn (?*PCache, ?*c_void, c_uint, c_uint) callconv(.C) void,
+        xFetch: ?fn (?*PCache, c_uint, c_int) callconv(.C) ?*anyopaque,
+        xUnpin: ?fn (?*PCache, ?*anyopaque, c_int) callconv(.C) void,
+        xRekey: ?fn (?*PCache, ?*anyopaque, c_uint, c_uint) callconv(.C) void,
         xTruncate: ?fn (?*PCache, c_uint) callconv(.C) void,
         xDestroy: ?fn (?*PCache) callconv(.C) void,
     };
