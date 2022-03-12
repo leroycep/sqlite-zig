@@ -225,7 +225,7 @@ pub fn checkSqliteErr(rc: c_int) Error!Success {
     extendedErrorFromCode(rc) catch |extended_err| return extended_err;
 
     // If nothing above returns, there's an unknown return code
-    std.debug.warn("unknown sqlite error code: {}\n", .{rc});
+    std.log.warn("unknown sqlite error code: {}\n", .{rc});
     panic("unknown sqlite error code\n", .{});
 }
 

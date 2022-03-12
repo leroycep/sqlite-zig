@@ -11,7 +11,7 @@ const c = @import("c.zig");
 
 /// Workaround Zig translate-c not being able to translate SQLITE_TRANSIENT into an actual value
 const S: isize = -1;
-const ZIG_SQLITE_TRANSIENT: fn (?*c_void) callconv(.C) void = @intToPtr(fn (?*c_void) callconv(.C) void, @bitCast(usize, S));
+const ZIG_SQLITE_TRANSIENT: fn (?*anyopaque) callconv(.C) void = @intToPtr(fn (?*anyopaque) callconv(.C) void, @bitCast(usize, S));
 
 pub const Db = struct {
     db: *c.sqlite3,
@@ -62,13 +62,12 @@ pub const Db = struct {
                 .private => c.SQLITE_OPEN_PRIVATECACHE,
             });
         }
-
         var rc = c.sqlite3_open_v2(filename, &db, option_flags, options.vfs_module orelse 0);
         errdefer errors.assertOkay(c.sqlite3_close(db));
 
         _ = try checkSqliteErr(rc);
 
-        var dbNonNull = db orelse panic("No error, sqlite db should not be null", null);
+        var dbNonNull = db orelse panic("No error, sqlite db should not be null", .{});
 
         return @This(){
             .db = dbNonNull,
@@ -137,7 +136,7 @@ pub const Stmt = struct {
             c.SQLITE_TEXT => return .Text,
             c.SQLITE_BLOB => return .Blob,
             c.SQLITE_NULL => return .Null,
-            else => panic("Unexpected sqlite datatype", null),
+            else => panic("Unexpected sqlite datatype", .{}),
         }
     }
 
@@ -352,14 +351,14 @@ test "open in memory sqlite db" {
                     0 => switch (col) {
                         0 => std.testing.expectEqual(Type{ .Integer = 1 }, val),
                         1 => std.testing.expect(Type.text("world").eql(&val)),
-                        else => panic("unexpected col in test", null),
+                        else => panic("unexpected col in test", .{}),
                     },
                     1 => switch (col) {
                         0 => std.testing.expectEqual(Type{ .Integer = 2 }, val),
                         1 => std.testing.expect(Type.text("foo").eql(&val)),
-                        else => panic("unexpected col in test", null),
+                        else => panic("unexpected col in test", .{}),
                     },
-                    else => panic("unexpected row in test", null),
+                    else => panic("unexpected row in test", .{}),
                 }
                 col += 1;
             }
