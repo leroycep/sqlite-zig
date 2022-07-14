@@ -12,16 +12,12 @@
       name = "sqlite-zig";
       src = ./.;
       
-      propogatedBuildInputs = [
-        nixpkgs.legacyPackages.x86_64-linux.sqlite
-      ];
-
       installPhase = ''
-        mkdir -p $out/sqlite-zig
-        install src/bind.zig $out/sqlite-zig/
-        install src/c.zig $out/sqlite-zig/
-        install src/error.zig $out/sqlite-zig/
-        install src/sqlite3.zig $out/sqlite-zig/
+        mkdir -p $out
+        cp src/sqlite3.zig $out
+        cp src/error.zig $out
+        cp dep/sqlite/sqlite3.c $out/
+        cp dep/sqlite/sqlite3.h $out/
       '';
     };
 
