@@ -4,7 +4,5 @@ main: src/sqlite3.zig
 license: MIT
 description: Zig bindings to sqlite3
 c_source_files:
- - dep/sqlite/sqlite3.c
-c_include_dirs:
- - dep/sqlite
+ - src/sqlite3.c
 dependencies:

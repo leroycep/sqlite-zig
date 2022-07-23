@@ -8,17 +8,29 @@ const EXAMPLES = .{
 };
 
 pub fn build(b: *Builder) void {
+    const target = b.standardTargetOptions(.{
+        // To deal with the error message:
+        //
+        //     LLD Link... ld.lld: error: undefined symbol: fcntl64
+        //
+        // We are using musl by default; though specifying a version of glibc would also work.
+        //
+        // See https://github.com/ziglang/zig/issues/9485#issue-956197415
+        .default_target = .{
+            .abi = .musl,
+        },
+    });
+
     const mode = b.standardReleaseOptions();
 
     const tests = b.addTest("src/sqlite3.zig");
     tests.setBuildMode(mode);
-    tests.addCSourceFile("dep/sqlite/sqlite3.c", &.{});
+    tests.setTarget(target);
+    tests.addCSourceFile("src/sqlite3.c", &.{});
     tests.linkLibC();
 
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&tests.step);
-
-    const target = b.standardTargetOptions(.{});
 
     const all_example_step = b.step("examples", "Build examples");
     inline for (EXAMPLES) |example_name| {
@@ -26,7 +38,7 @@ pub fn build(b: *Builder) void {
         example.addPackagePath("sqlite", "src/sqlite3.zig");
         example.setBuildMode(mode);
         example.setTarget(target);
-        example.addCSourceFile("dep/sqlite/sqlite3.c", &.{});
+        example.addCSourceFile("src/sqlite3.c", &.{});
         example.linkLibC();
 
         b.step("run-example-" ++ example_name, "Run the " ++ example_name ++ " example").dependOn(&example.run().step);
