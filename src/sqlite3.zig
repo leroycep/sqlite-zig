@@ -291,7 +291,7 @@ pub const Stmt = opaque {
 
 pub extern fn sqlite3_errstr(c_int) ?[*:0]const u8;
 pub fn errstr(errcode: c_int) [:0]const u8 {
-    return std.mem.span(sqlite3_errstr(errcode));
+    return std.mem.span(sqlite3_errstr(errcode) orelse return "");
 }
 
 pub const SQLiteType = enum(c_int) {
