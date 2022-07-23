@@ -77,7 +77,7 @@ pub fn main() !void {
             return;
         }
 
-        var stmt = try db.prepare_v2(SQL_INSERT_POST, null);
+        var stmt = (try db.prepare_v2(SQL_INSERT_POST, null)).?;
         try stmt.bindText(1, args[2], .static);
         try stmt.bindText(2, args[2], .static);
 
@@ -98,7 +98,7 @@ pub fn main() !void {
         const title = args[3];
         const content = args[4];
 
-        var stmt = try db.prepare_v2(SQL_UPDATE_POST, null);
+        var stmt = (try db.prepare_v2(SQL_UPDATE_POST, null)).?;
         try stmt.bindText(1, title, .static);
         try stmt.bindText(2, content, .static);
         try stmt.bindInt64(3, id);
@@ -118,7 +118,7 @@ pub fn main() !void {
             return error.NotAnInt;
         };
 
-        var stmt = try db.prepare_v2(SQL_DELETE_POST, null);
+        var stmt = (try db.prepare_v2(SQL_DELETE_POST, null)).?;
         try stmt.bindInt64(3, id);
 
         std.debug.assert((try stmt.step()) == .Done);
@@ -156,7 +156,7 @@ fn read(out: anytype, db: *sqlite.SQLite3, opts: ReadOptions) !void {
             .LastInserted => SQL_GET_LAST_INSERTED,
         };
 
-        var stmt = try db.prepare_v2(sql, null);
+        var stmt = (try db.prepare_v2(sql, null)).?;
         defer stmt.finalize() catch {};
         if (post == .LastInserted) {
             try stmt.bindInt64(1, post.Id);
@@ -171,7 +171,7 @@ fn read(out: anytype, db: *sqlite.SQLite3, opts: ReadOptions) !void {
         }
         try displaySinglePost(out, stmt);
     } else {
-        var stmt = try db.prepare_v2(SQL_GET_POSTS, null);
+        var stmt = (try db.prepare_v2(SQL_GET_POSTS, null)).?;
         defer stmt.finalize() catch {};
 
         try out.print("Posts:\n", .{});

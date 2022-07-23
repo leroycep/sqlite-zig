@@ -24,7 +24,7 @@ pub fn main() !void {
         null,
     );
 
-    var stmt = try db.prepare_v2("SELECT id, username FROM users;", null);
+    var stmt = (try db.prepare_v2("SELECT id, username FROM users;", null)).?;
     defer stmt.finalize() catch unreachable;
 
     const out = std.io.getStdOut().writer();

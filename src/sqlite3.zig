@@ -105,7 +105,7 @@ pub const SQLite3 = opaque {
     pub extern fn sqlite3_prepare(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
     pub extern fn sqlite3_prepare_v2(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
 
-    pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[]const u8) !*Stmt {
+    pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[]const u8) !?*Stmt {
         //var sql_tail_buf: [*:0]const u8 = undefined;
         var sql_tail_ptr: ?*[*]const u8 = if (sqlTailOpt) |sqlTail| &sqlTail.ptr else null;
 
@@ -118,7 +118,7 @@ pub const SQLite3 = opaque {
             sqlTail.len = sql.len - diff;
         }
 
-        return pp_stmt.?;
+        return pp_stmt;
     }
 };
 

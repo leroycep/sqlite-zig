@@ -41,7 +41,10 @@ pub fn build(b: *Builder) void {
         example.addCSourceFile("src/sqlite3.c", &.{});
         example.linkLibC();
 
-        b.step("run-example-" ++ example_name, "Run the " ++ example_name ++ " example").dependOn(&example.run().step);
+        var run = example.run();
+        if (b.args) |args| run.addArgs(args);
+        b.step("run-example-" ++ example_name, "Run the " ++ example_name ++ " example").dependOn(&run.step);
+
         all_example_step.dependOn(&example.step);
     }
 }
