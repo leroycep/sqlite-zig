@@ -94,7 +94,7 @@ pub const SQLite3 = opaque {
     }
 
     // exec
-    pub const ExecCallback = fn (userdata: ?*anyopaque, number_of_result_columns: c_int, columnsAsText: [*]?[*:0]u8, columnNames: [*]?[*:0]u8) callconv(.C) c_int;
+    pub const ExecCallback = *const fn (userdata: ?*anyopaque, number_of_result_columns: c_int, columnsAsText: [*]?[*:0]u8, columnNames: [*]?[*:0]u8) callconv(.C) c_int;
     pub extern fn sqlite3_exec(*SQLite3, sql: [*:0]const u8, callback: ?ExecCallback, ?*anyopaque, pErrmsg: ?*[*:0]u8) c_int;
 
     pub fn exec(this: *@This(), sql: [*:0]const u8, callback: ?ExecCallback, userdata: ?*anyopaque, pErrmsg: ?*[*:0]u8) !void {
@@ -105,18 +105,10 @@ pub const SQLite3 = opaque {
     pub extern fn sqlite3_prepare(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
     pub extern fn sqlite3_prepare_v2(*SQLite3, zSql: [*]const u8, maxLen: c_int, ppStmt: *?*Stmt, pzTail: ?*[*]const u8) c_int;
 
-    pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[]const u8) !?*Stmt {
-        //var sql_tail_buf: [*:0]const u8 = undefined;
-        var sql_tail_ptr: ?*[*]const u8 = if (sqlTailOpt) |sqlTail| &sqlTail.ptr else null;
-
+    pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[*]const u8) !?*Stmt {
         var pp_stmt: ?*Stmt = null;
         errdefer _ = Stmt.sqlite3_finalize(pp_stmt);
-        _ = try checkSqliteErr(sqlite3_prepare_v2(this, sql.ptr, @intCast(c_int, sql.len), &pp_stmt, sql_tail_ptr));
-
-        if (sqlTailOpt) |sqlTail| {
-            const diff = @ptrToInt(sqlTail.ptr) -| @ptrToInt(sql.ptr);
-            sqlTail.len = sql.len - diff;
-        }
+        _ = try checkSqliteErr(sqlite3_prepare_v2(this, sql.ptr, @intCast(c_int, sql.len), &pp_stmt, sqlTailOpt));
 
         return pp_stmt;
     }
@@ -302,7 +294,7 @@ pub const SQLiteType = enum(c_int) {
     @"null" = 5,
 };
 
-pub const DestructorFn = fn (*anyopaque) callconv(.C) void;
+pub const DestructorFn = *const fn (*anyopaque) callconv(.C) void;
 
 pub const DestructorType = union(enum) {
     destructor: DestructorFn,
@@ -361,7 +353,7 @@ pub fn config(params: ConfigParams) !void {
         .memstatus,
         .uri,
         .covering_index_scan,
-        => |p| sqlite3_config(option, @boolToInt(p)),
+        => |p| sqlite3_config(option, @as(c_int, @boolToInt(p))),
 
         .pagecache => |p| sqlite3_config(option, p.pMem, p.sz, p.n),
         .heap => |p| sqlite3_config(
@@ -427,13 +419,13 @@ pub const ConfigParams = union(ConfigOption) {
     pcache2: *PCache.Methods2,
     getpcache2: *PCache.Methods2,
     log: struct {
-        logFn: fn (userdata: *anyopaque, errcode: c_int, msg: ?[*:0]const u8) callconv(.C) void,
+        logFn: *const fn (userdata: *anyopaque, errcode: c_int, msg: ?[*:0]const u8) callconv(.C) void,
         userdata: ?*anyopaque,
     },
     uri: bool,
     covering_index_scan: bool,
     sqllog: struct {
-        logFn: fn (userdata: *anyopaque, db: *SQLite3, dbFilename: ?[*:0]const u8, sqllog: c_int) callconv(.C) void,
+        logFn: *const fn (userdata: *anyopaque, db: *SQLite3, dbFilename: ?[*:0]const u8, sqllog: c_int) callconv(.C) void,
         userdata: ?*anyopaque,
     },
     mmap_size: struct {
@@ -506,28 +498,28 @@ pub const SQLITE_CONFIG_SORTERREF_SIZE = @as(c_int, 28);
 pub const SQLITE_CONFIG_MEMDB_MAXSIZE = @as(c_int, 29);
 
 pub const sqlite3_mem_methods = extern struct {
-    xMalloc: ?fn (c_int) callconv(.C) ?*anyopaque,
-    xFree: ?fn (?*anyopaque) callconv(.C) void,
-    xRealloc: ?fn (?*anyopaque, c_int) callconv(.C) ?*anyopaque,
-    xSize: ?fn (?*anyopaque) callconv(.C) c_int,
-    xRoundup: ?fn (c_int) callconv(.C) c_int,
-    xInit: ?fn (?*anyopaque) callconv(.C) c_int,
-    xShutdown: ?fn (?*anyopaque) callconv(.C) void,
+    xMalloc: ?*const fn (c_int) callconv(.C) ?*anyopaque,
+    xFree: ?*const fn (?*anyopaque) callconv(.C) void,
+    xRealloc: ?*const fn (?*anyopaque, c_int) callconv(.C) ?*anyopaque,
+    xSize: ?*const fn (?*anyopaque) callconv(.C) c_int,
+    xRoundup: ?*const fn (c_int) callconv(.C) c_int,
+    xInit: ?*const fn (?*anyopaque) callconv(.C) c_int,
+    xShutdown: ?*const fn (?*anyopaque) callconv(.C) void,
     pAppData: ?*anyopaque,
 };
 
 // Mutex
 pub const Mutex = opaque {
     pub const Methods = extern struct {
-        xMutexInit: ?fn () callconv(.C) c_int,
-        xMutexEnd: ?fn () callconv(.C) c_int,
-        xMutexAlloc: ?fn (c_int) callconv(.C) ?*Mutex,
-        xMutexFree: ?fn (?*Mutex) callconv(.C) void,
-        xMutexEnter: ?fn (?*Mutex) callconv(.C) void,
-        xMutexTry: ?fn (?*Mutex) callconv(.C) c_int,
-        xMutexLeave: ?fn (?*Mutex) callconv(.C) void,
-        xMutexHeld: ?fn (?*Mutex) callconv(.C) c_int,
-        xMutexNotheld: ?fn (?*Mutex) callconv(.C) c_int,
+        xMutexInit: ?*const fn () callconv(.C) c_int,
+        xMutexEnd: ?*const fn () callconv(.C) c_int,
+        xMutexAlloc: ?*const fn (c_int) callconv(.C) ?*Mutex,
+        xMutexFree: ?*const fn (?*Mutex) callconv(.C) void,
+        xMutexEnter: ?*const fn (?*Mutex) callconv(.C) void,
+        xMutexTry: ?*const fn (?*Mutex) callconv(.C) c_int,
+        xMutexLeave: ?*const fn (?*Mutex) callconv(.C) void,
+        xMutexHeld: ?*const fn (?*Mutex) callconv(.C) c_int,
+        xMutexNotheld: ?*const fn (?*Mutex) callconv(.C) c_int,
     };
 };
 
@@ -541,31 +533,31 @@ pub const PCache = opaque {
     pub const Methods2 = extern struct {
         iVersion: c_int,
         pArg: ?*anyopaque,
-        xInit: ?fn (?*anyopaque) callconv(.C) c_int,
-        xShutdown: ?fn (?*anyopaque) callconv(.C) void,
-        xCreate: ?fn (c_int, c_int, c_int) callconv(.C) ?*PCache,
-        xCachesize: ?fn (?*PCache, c_int) callconv(.C) void,
-        xPagecount: ?fn (?*PCache) callconv(.C) c_int,
-        xFetch: ?fn (?*PCache, c_uint, c_int) callconv(.C) [*c]Page,
-        xUnpin: ?fn (?*PCache, [*c]Page, c_int) callconv(.C) void,
-        xRekey: ?fn (?*PCache, [*c]Page, c_uint, c_uint) callconv(.C) void,
-        xTruncate: ?fn (?*PCache, c_uint) callconv(.C) void,
-        xDestroy: ?fn (?*PCache) callconv(.C) void,
-        xShrink: ?fn (?*PCache) callconv(.C) void,
+        xInit: ?*const fn (?*anyopaque) callconv(.C) c_int,
+        xShutdown: ?*const fn (?*anyopaque) callconv(.C) void,
+        xCreate: ?*const fn (c_int, c_int, c_int) callconv(.C) ?*PCache,
+        xCachesize: ?*const fn (?*PCache, c_int) callconv(.C) void,
+        xPagecount: ?*const fn (?*PCache) callconv(.C) c_int,
+        xFetch: ?*const fn (?*PCache, c_uint, c_int) callconv(.C) [*c]Page,
+        xUnpin: ?*const fn (?*PCache, [*c]Page, c_int) callconv(.C) void,
+        xRekey: ?*const fn (?*PCache, [*c]Page, c_uint, c_uint) callconv(.C) void,
+        xTruncate: ?*const fn (?*PCache, c_uint) callconv(.C) void,
+        xDestroy: ?*const fn (?*PCache) callconv(.C) void,
+        xShrink: ?*const fn (?*PCache) callconv(.C) void,
     };
 
     pub const Methods = extern struct {
         pArg: ?*anyopaque,
-        xInit: ?fn (?*anyopaque) callconv(.C) c_int,
-        xShutdown: ?fn (?*anyopaque) callconv(.C) void,
-        xCreate: ?fn (c_int, c_int) callconv(.C) ?*PCache,
-        xCachesize: ?fn (?*PCache, c_int) callconv(.C) void,
-        xPagecount: ?fn (?*PCache) callconv(.C) c_int,
-        xFetch: ?fn (?*PCache, c_uint, c_int) callconv(.C) ?*anyopaque,
-        xUnpin: ?fn (?*PCache, ?*anyopaque, c_int) callconv(.C) void,
-        xRekey: ?fn (?*PCache, ?*anyopaque, c_uint, c_uint) callconv(.C) void,
-        xTruncate: ?fn (?*PCache, c_uint) callconv(.C) void,
-        xDestroy: ?fn (?*PCache) callconv(.C) void,
+        xInit: ?*const fn (?*anyopaque) callconv(.C) c_int,
+        xShutdown: ?*const fn (?*anyopaque) callconv(.C) void,
+        xCreate: ?*const fn (c_int, c_int) callconv(.C) ?*PCache,
+        xCachesize: ?*const fn (?*PCache, c_int) callconv(.C) void,
+        xPagecount: ?*const fn (?*PCache) callconv(.C) c_int,
+        xFetch: ?*const fn (?*PCache, c_uint, c_int) callconv(.C) ?*anyopaque,
+        xUnpin: ?*const fn (?*PCache, ?*anyopaque, c_int) callconv(.C) void,
+        xRekey: ?*const fn (?*PCache, ?*anyopaque, c_uint, c_uint) callconv(.C) void,
+        xTruncate: ?*const fn (?*PCache, c_uint) callconv(.C) void,
+        xDestroy: ?*const fn (?*PCache) callconv(.C) void,
     };
 };
 
