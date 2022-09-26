@@ -135,8 +135,8 @@ pub const Stmt = opaque {
     pub extern fn sqlite3_column_double(*Stmt, iCol: c_int) f64;
     pub extern fn sqlite3_column_int(*Stmt, iCol: c_int) c_int;
     pub extern fn sqlite3_column_int64(*Stmt, iCol: c_int) i64;
-    pub extern fn sqlite3_column_text(*Stmt, iCol: c_int) [*:0]const u8;
-    pub extern fn sqlite3_column_text16(*Stmt, iCol: c_int) *const anyopaque;
+    pub extern fn sqlite3_column_text(*Stmt, iCol: c_int) ?[*:0]const u8;
+    pub extern fn sqlite3_column_text16(*Stmt, iCol: c_int) ?*const anyopaque;
     //pub extern fn sqlite3_column_value(*Stmt, iCol: c_int) ?*Value;
 
     pub extern fn sqlite3_column_bytes(*Stmt, iCol: c_int) c_int;
@@ -157,14 +157,14 @@ pub const Stmt = opaque {
         return sqlite3_column_int64(this, iCol);
     }
 
-    pub fn columnText(this: *@This(), iCol: c_int) [:0]const u8 {
-        const text_ptr = sqlite3_column_text(this, iCol);
+    pub fn columnText(this: *@This(), iCol: c_int) ?[:0]const u8 {
+        const text_ptr = sqlite3_column_text(this, iCol) orelse return null;
         const text_len = sqlite3_column_bytes(this, iCol);
         return text_ptr[0..@intCast(usize, text_len) :0];
     }
 
     pub fn columnText16(this: *@This(), iCol: c_int) [:0]const u16 {
-        const text_ptr = sqlite3_column_text(this, iCol);
+        const text_ptr = sqlite3_column_text(this, iCol) orelse return null;
         const text_len = sqlite3_column_bytes16(this, iCol) / @sizeOf(u16);
         return text_ptr[0..@intCast(usize, text_len) :0];
     }
