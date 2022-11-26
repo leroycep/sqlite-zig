@@ -2,10 +2,10 @@ const std = @import("std");
 const sqlite = @import("sqlite");
 
 pub fn main() !void {
-    const db = try sqlite.Db.open("simple.db");
+    const db = try sqlite.SQLite3.open("simple.db");
     defer db.close() catch unreachable;
 
-    var rows = db.exec(
+    try db.exec(
         \\ DROP TABLE IF EXISTS users;
         \\ CREATE TABLE users(
         \\   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,27 +18,28 @@ pub fn main() !void {
         \\   ("adolin"),
         \\   ("dalinar")
         \\ ;
-        \\ SELECT id, username FROM users;
+    ,
+        null,
+        null,
+        null,
     );
-    defer rows.finalize() catch {};
 
-    std.debug.warn(" {s}\t{s}\n", .{ "id", "username" });
-    std.debug.warn(" {s}\t{s}\n", .{ "--", "--------" });
+    var stmt = (try db.prepare_v2("SELECT id, username FROM users;", null)).?;
+    defer stmt.finalize() catch unreachable;
+
+    const out = std.io.getStdOut().writer();
+    try out.print(" {s}\t{s}\n", .{ "id", "username" });
+    try out.print(" {s}\t{s}\n", .{ "--", "--------" });
     while (true) {
-        const row_item_opt = rows.next() catch |e| {
-            std.debug.warn("sqlite3 errmsg: {s}\n", .{db.errmsg()});
-            return e;
-        };
-        const row_item = row_item_opt orelse break;
-        const row = switch (row_item) {
-            // Ignore when statements are completed
-            .Done => continue,
-            .Row => |r| r,
-        };
+        switch (try stmt.step()) {
+            .Done => break,
+            .Row => {},
+            .Ok => unreachable,
+        }
 
-        const id = row.columnInt(0);
-        const username = row.columnText(1);
+        const id = stmt.columnInt(0);
+        const username = stmt.columnText(1);
 
-        std.debug.warn(" {}\t{s}\n", .{ id, username });
+        try out.print(" {}\t{s}\n", .{ id, username });
     }
 }
