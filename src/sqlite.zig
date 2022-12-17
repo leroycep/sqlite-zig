@@ -11,7 +11,7 @@ const c = @import("c.zig");
 
 /// Workaround Zig translate-c not being able to translate SQLITE_TRANSIENT into an actual value
 const S: isize = -1;
-const ZIG_SQLITE_TRANSIENT: fn (?*c_void) callconv(.C) void = @intToPtr(fn (?*c_void) callconv(.C) void, @bitCast(usize, S));
+const ZIG_SQLITE_TRANSIENT: fn (?*anyopaque) callconv(.C) void = @intToPtr(fn (?*anyopaque) callconv(.C) void, @bitCast(usize, S));
 
 pub const Db = struct {
     db: *c.sqlite3,
