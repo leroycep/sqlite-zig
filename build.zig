@@ -23,6 +23,13 @@ pub fn build(b: *Builder) void {
 
     const mode = b.standardReleaseOptions();
 
+    const lib = b.addStaticLibrary("sqlite3", null);
+    lib.setTarget(target);
+    lib.setBuildMode(mode);
+    lib.linkLibC();
+    lib.addCSourceFile("src/sqlite3.c", &.{});
+    lib.install();
+
     const tests = b.addTest("src/sqlite3.zig");
     tests.setBuildMode(mode);
     tests.setTarget(target);
