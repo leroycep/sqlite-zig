@@ -5,7 +5,7 @@ pub const SQLite3 = opaque {
     // open
     pub extern fn sqlite3_open([*:0]const u8, *?*SQLite3) c_int;
     pub extern fn sqlite3_open16([*]const anyopaque, *?*SQLite3) c_int;
-    pub extern fn sqlite3_open_v2([*:0]const u8, *?*SQLite3, c_int, [*:0]const u8) c_int;
+    pub extern fn sqlite3_open_v2([*:0]const u8, *?*SQLite3, c_int, ?[*:0]const u8) c_int;
 
     pub fn open(filename: [*:0]const u8) !*SQLite3 {
         var db: ?*SQLite3 = null;
@@ -45,7 +45,7 @@ pub const SQLite3 = opaque {
         nofollow: bool = false,
     };
 
-    pub fn open_v2(filename: [*:0]const u8, flags: OpenV2Flags, zVfs: [*:0]const u8) !*SQLite3 {
+    pub fn open_v2(filename: [*:0]const u8, flags: OpenV2Flags, zVfs: ?[*:0]const u8) !*SQLite3 {
         var db: ?*SQLite3 = null;
         errdefer {
             if (db) |db_not_null| {
