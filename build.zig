@@ -23,7 +23,8 @@ pub fn build(b: *Builder) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
-    const module = b.createModule(.{
+    b.addModule(.{
+        .name = "sqlite3",
         .source_file = .{ .path = "src/sqlite3.zig" },
     });
 
@@ -33,7 +34,6 @@ pub fn build(b: *Builder) void {
         .optimize = optimize,
     });
     lib.addCSourceFile("src/sqlite3.c", &.{});
-    lib.addModule("sqlite3", module);
     lib.linkLibC();
     lib.install();
 
@@ -56,7 +56,9 @@ pub fn build(b: *Builder) void {
             .target = target,
             .optimize = optimize,
         });
-        example.addModule("sqlite", module);
+        example.addAnonymousModule("sqlite", .{
+            .source_file = .{ .path = "src/sqlite3.zig" },
+        });
         example.linkLibrary(lib);
 
         var run = example.run();
