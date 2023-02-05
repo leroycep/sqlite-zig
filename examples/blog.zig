@@ -79,7 +79,7 @@ pub fn main() !void {
 
         var stmt = (try db.prepare_v2(SQL_INSERT_POST, null)).?;
         try stmt.bindText(1, args[2], .static);
-        try stmt.bindText(2, args[2], .static);
+        try stmt.bindText(2, args[3], .static);
 
         std.debug.assert((try stmt.step()) == .Done);
 
@@ -158,8 +158,9 @@ fn read(out: anytype, db: *sqlite.SQLite3, opts: ReadOptions) !void {
 
         var stmt = (try db.prepare_v2(sql, null)).?;
         defer stmt.finalize() catch {};
-        if (post == .LastInserted) {
-            try stmt.bindInt64(1, post.Id);
+        switch (post) {
+            .Id => |id| try stmt.bindInt64(1, id),
+            .LastInserted => {},
         }
 
         switch (try stmt.step()) {
@@ -179,7 +180,7 @@ fn read(out: anytype, db: *sqlite.SQLite3, opts: ReadOptions) !void {
             const id = stmt.columnInt64(0);
             const title = stmt.columnText(1);
             const content = stmt.columnText(2);
-            try out.print("\t{}\t{s}\t{s}\n", .{ id, title, content });
+            try out.print("\t{}\t{?s}\t{?s}\n", .{ id, title, content });
         }
     }
 }
@@ -190,9 +191,9 @@ fn displaySinglePost(out: anytype, stmt: *sqlite.Stmt) !void {
     const content = stmt.columnText(2);
     try out.print(
         \\ Id: {}
-        \\ Title: {s}
+        \\ Title: {?s}
         \\
-        \\ {s}
+        \\ {?s}
         \\
     , .{ id, title, content });
 }

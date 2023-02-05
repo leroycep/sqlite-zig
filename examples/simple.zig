@@ -40,6 +40,6 @@ pub fn main() !void {
         const id = stmt.columnInt(0);
         const username = stmt.columnText(1);
 
-        try out.print(" {}\t{s}\n", .{ id, username });
+        try out.print(" {}\t{?s}\n", .{ id, username });
     }
 }

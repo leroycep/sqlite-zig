@@ -21,18 +21,27 @@ pub fn build(b: *Builder) void {
         },
     });
 
-    const mode = b.standardReleaseOptions();
+    const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary("sqlite3", null);
-    lib.setTarget(target);
-    lib.setBuildMode(mode);
-    lib.linkLibC();
+    const module = b.createModule(.{
+        .source_file = .{ .path = "src/sqlite3.zig" },
+    });
+
+    const lib = b.addStaticLibrary(.{
+        .name = "sqlite3",
+        .target = target,
+        .optimize = optimize,
+    });
     lib.addCSourceFile("src/sqlite3.c", &.{});
+    lib.addModule("sqlite3", module);
+    lib.linkLibC();
     lib.install();
 
-    const tests = b.addTest("src/sqlite3.zig");
-    tests.setBuildMode(mode);
-    tests.setTarget(target);
+    const tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/sqlite3.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
     tests.addCSourceFile("src/sqlite3.c", &.{});
     tests.linkLibC();
 
@@ -41,12 +50,14 @@ pub fn build(b: *Builder) void {
 
     const all_example_step = b.step("examples", "Build examples");
     inline for (EXAMPLES) |example_name| {
-        const example = b.addExecutable(example_name, "examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig");
-        example.addPackagePath("sqlite", "src/sqlite3.zig");
-        example.setBuildMode(mode);
-        example.setTarget(target);
-        example.addCSourceFile("src/sqlite3.c", &.{});
-        example.linkLibC();
+        const example = b.addExecutable(.{
+            .name = example_name,
+            .root_source_file = .{ .path = "examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig" },
+            .target = target,
+            .optimize = optimize,
+        });
+        example.addModule("sqlite", module);
+        example.linkLibrary(lib);
 
         var run = example.run();
         if (b.args) |args| run.addArgs(args);
