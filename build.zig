@@ -23,8 +23,7 @@ pub fn build(b: *Builder) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
-    b.addModule(.{
-        .name = "sqlite3",
+    _ = b.addModule("sqlite3", .{
         .source_file = .{ .path = "src/sqlite3.zig" },
     });
 
