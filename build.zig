@@ -34,7 +34,7 @@ pub fn build(b: *Builder) void {
     });
     lib.addCSourceFile("src/sqlite3.c", &.{});
     lib.linkLibC();
-    lib.install();
+    b.installArtifact(lib);
 
     const tests = b.addTest(.{
         .root_source_file = .{ .path = "src/sqlite3.zig" },
@@ -60,7 +60,7 @@ pub fn build(b: *Builder) void {
         });
         example.linkLibrary(lib);
 
-        var run = example.run();
+        var run = b.addRunArtifact(example);
         if (b.args) |args| run.addArgs(args);
         b.step("run-example-" ++ example_name, "Run the " ++ example_name ++ " example").dependOn(&run.step);
 
