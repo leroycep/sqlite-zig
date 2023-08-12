@@ -8,22 +8,11 @@ const EXAMPLES = .{
 };
 
 pub fn build(b: *Builder) void {
-    const target = b.standardTargetOptions(.{
-        // To deal with the error message:
-        //
-        //     LLD Link... ld.lld: error: undefined symbol: fcntl64
-        //
-        // We are using musl by default; though specifying a version of glibc would also work.
-        //
-        // See https://github.com/ziglang/zig/issues/9485#issue-956197415
-        .default_target = .{
-            .abi = .musl,
-        },
-    });
+    const target = b.standardTargetOptions(.{});
 
     const optimize = b.standardOptimizeOption(.{});
 
-    _ = b.addModule("sqlite3", .{
+    const module = b.addModule("sqlite3", .{
         .source_file = .{ .path = "src/sqlite3.zig" },
     });
 
@@ -32,7 +21,10 @@ pub fn build(b: *Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    lib.addCSourceFile("src/sqlite3.c", &.{});
+    lib.addCSourceFile(.{
+        .file = .{ .path = "src/sqlite3.c" },
+        .flags = &.{},
+    });
     lib.linkLibC();
     b.installArtifact(lib);
 
@@ -41,8 +33,7 @@ pub fn build(b: *Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    tests.addCSourceFile("src/sqlite3.c", &.{});
-    tests.linkLibC();
+    tests.linkLibrary(lib);
 
     const test_step = b.step("test", "Run all tests");
     test_step.dependOn(&tests.step);
@@ -55,9 +46,7 @@ pub fn build(b: *Builder) void {
             .target = target,
             .optimize = optimize,
         });
-        example.addAnonymousModule("sqlite", .{
-            .source_file = .{ .path = "src/sqlite3.zig" },
-        });
+        example.addModule("sqlite", module);
         example.linkLibrary(lib);
 
         var run = b.addRunArtifact(example);
