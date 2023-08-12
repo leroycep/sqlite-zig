@@ -108,7 +108,7 @@ pub const SQLite3 = opaque {
     pub fn prepare_v2(this: *@This(), sql: []const u8, sqlTailOpt: ?*[*]const u8) !?*Stmt {
         var pp_stmt: ?*Stmt = null;
         errdefer _ = Stmt.sqlite3_finalize(pp_stmt);
-        _ = try checkSqliteErr(sqlite3_prepare_v2(this, sql.ptr, @intCast(c_int, sql.len), &pp_stmt, sqlTailOpt));
+        _ = try checkSqliteErr(sqlite3_prepare_v2(this, sql.ptr, @intCast(sql.len), &pp_stmt, sqlTailOpt));
 
         return pp_stmt;
     }
@@ -146,7 +146,7 @@ pub const Stmt = opaque {
     pub fn columnBlob(this: *@This(), iCol: c_int) ?[]const u8 {
         const blob_ptr = sqlite3_column_blob(this, iCol) orelse return null;
         const blob_len = sqlite3_column_bytes(this, iCol);
-        return @ptrCast([*]const u8, blob_ptr)[0..@intCast(usize, blob_len)];
+        return @as([*]const u8, blob_ptr)[0..@intCast(blob_len)];
     }
 
     pub fn columnInt(this: *@This(), iCol: c_int) c_int {
@@ -160,13 +160,13 @@ pub const Stmt = opaque {
     pub fn columnText(this: *@This(), iCol: c_int) ?[:0]const u8 {
         const text_ptr = sqlite3_column_text(this, iCol) orelse return null;
         const text_len = sqlite3_column_bytes(this, iCol);
-        return text_ptr[0..@intCast(usize, text_len) :0];
+        return text_ptr[0..@intCast(text_len) :0];
     }
 
     pub fn columnText16(this: *@This(), iCol: c_int) [:0]const u16 {
         const text_ptr = sqlite3_column_text(this, iCol) orelse return null;
         const text_len = sqlite3_column_bytes16(this, iCol) / @sizeOf(u16);
-        return text_ptr[0..@intCast(usize, text_len) :0];
+        return text_ptr[0..@intCast(text_len) :0];
     }
 
     // TODO: Supprt columnValue as well (it has a bunch of caveats listed, focus on it later)
@@ -174,7 +174,7 @@ pub const Stmt = opaque {
     pub const columnBytes16 = sqlite3_column_bytes16;
 
     pub fn columnType(this: *@This(), iCol: c_int) SQLiteType {
-        return @intToEnum(SQLiteType, sqlite3_column_type(this, iCol));
+        return @as(SQLiteType, sqlite3_column_type(this, iCol));
     }
 
     // bind
@@ -197,7 +197,7 @@ pub const Stmt = opaque {
             this,
             iCol,
             if (value) |v| v.ptr else null,
-            if (value) |v| @intCast(u64, v.len) else 0,
+            if (value) |v| @intCast(v.len) else 0,
             destructorType.getFnValue(),
         ));
     }
@@ -225,7 +225,7 @@ pub const Stmt = opaque {
             this,
             iCol,
             if (value) |v| v.ptr else null,
-            if (value) |v| @intCast(c_int, v.len) else 0,
+            if (value) |v| @intCast(v.len) else 0,
             destructorType.getFnValue(),
         ));
     }
@@ -247,7 +247,7 @@ pub const Stmt = opaque {
             if (value) |v| v.ptr else null,
             if (value) |v| v.len else 0,
             destructorType.getFnValue(),
-            @enumToInt(encoding),
+            @enumFromInt(encoding),
         ));
     }
 
@@ -291,7 +291,7 @@ pub const SQLiteType = enum(c_int) {
     float = 2,
     text = 3,
     blob = 4,
-    @"null" = 5,
+    null = 5,
 };
 
 pub const DestructorFn = *const fn (*anyopaque) callconv(.C) void;
@@ -304,8 +304,8 @@ pub const DestructorType = union(enum) {
     fn getFnValue(this: @This()) ?DestructorFn {
         return switch (this) {
             .destructor => |d| d,
-            .static => @intToPtr(?DestructorFn, 0),
-            .transient => @intToPtr(?DestructorFn, 0),
+            .static => @as(?DestructorFn, @ptrFromInt(0)),
+            .transient => @as(?DestructorFn, @ptrFromInt(0)),
         };
     }
 };
@@ -338,7 +338,7 @@ pub const msize = sqlite3_msize;
 pub extern fn sqlite3_config(c_int, ...) c_int;
 
 pub fn config(params: ConfigParams) !void {
-    const option = @enumToInt(params);
+    const option = @intFromEnum(params);
     const result = switch (params) {
         .singlethread,
         .multithread,
@@ -353,7 +353,7 @@ pub fn config(params: ConfigParams) !void {
         .memstatus,
         .uri,
         .covering_index_scan,
-        => |p| sqlite3_config(option, @as(c_int, @boolToInt(p))),
+        => |p| sqlite3_config(option, @as(c_int, @intFromBool(p))),
 
         .pagecache => |p| sqlite3_config(option, p.pMem, p.sz, p.n),
         .heap => |p| sqlite3_config(
