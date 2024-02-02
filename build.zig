@@ -10,6 +10,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const should_install_shell = b.option(bool, "shell", "Build and install the sqlite3 command line interface (default: false)") orelse false;
+
     const lib = b.addStaticLibrary(.{
         .name = "sqlite3",
         .target = target,
@@ -28,7 +30,9 @@ pub fn build(b: *std.Build) void {
     });
     shell.addCSourceFile(.{ .file = .{ .path = "src/shell.c" } });
     shell.linkLibrary(lib);
-    b.installArtifact(shell);
+    if (should_install_shell) {
+        b.installArtifact(shell);
+    }
 
     const module = b.addModule("sqlite3", .{
         .root_source_file = .{ .path = "src/sqlite3.zig" },
