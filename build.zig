@@ -1,5 +1,4 @@
 const std = @import("std");
-const Builder = std.build.Builder;
 
 const EXAMPLES = .{
     "simple-exec",
@@ -7,26 +6,36 @@ const EXAMPLES = .{
     "blog",
 };
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-
     const optimize = b.standardOptimizeOption(.{});
-
-    const module = b.addModule("sqlite3", .{
-        .source_file = .{ .path = "src/sqlite3.zig" },
-    });
 
     const lib = b.addStaticLibrary(.{
         .name = "sqlite3",
         .target = target,
         .optimize = optimize,
     });
-    lib.addCSourceFile(.{
-        .file = .{ .path = "src/sqlite3.c" },
-        .flags = &.{},
-    });
+    lib.installHeader("src/sqlite3.h", "sqlite3.h");
+    lib.installHeader("src/sqlite3ext.h", "sqlite3ext.h");
+    lib.addCSourceFile(.{ .file = .{ .path = "src/sqlite3.c" } });
     lib.linkLibC();
     b.installArtifact(lib);
+
+    const shell = b.addExecutable(.{
+        .name = "sqlite3",
+        .target = target,
+        .optimize = optimize,
+    });
+    shell.addCSourceFile(.{ .file = .{ .path = "src/shell.c" } });
+    shell.linkLibrary(lib);
+    b.installArtifact(shell);
+
+    const module = b.addModule("sqlite3", .{
+        .root_source_file = .{ .path = "src/sqlite3.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    module.linkLibrary(lib);
 
     const tests = b.addTest(.{
         .root_source_file = .{ .path = "src/sqlite3.zig" },
@@ -46,13 +55,14 @@ pub fn build(b: *Builder) void {
             .target = target,
             .optimize = optimize,
         });
-        example.addModule("sqlite", module);
-        example.linkLibrary(lib);
+        example.root_module.addImport("sqlite", module);
+
+        const install_example = b.addInstallArtifact(example, .{});
 
         var run = b.addRunArtifact(example);
         if (b.args) |args| run.addArgs(args);
         b.step("run-example-" ++ example_name, "Run the " ++ example_name ++ " example").dependOn(&run.step);
 
-        all_example_step.dependOn(&example.step);
+        all_example_step.dependOn(&install_example.step);
     }
 }
