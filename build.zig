@@ -17,9 +17,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    lib.installHeader(.{ .path = "src/sqlite3.h" }, "sqlite3.h");
-    lib.installHeader(.{ .path = "src/sqlite3ext.h" }, "sqlite3ext.h");
-    lib.addCSourceFile(.{ .file = .{ .path = "src/sqlite3.c" } });
+    lib.installHeader(b.path("src/sqlite3.h"), "sqlite3.h");
+    lib.installHeader(b.path("src/sqlite3ext.h"), "sqlite3ext.h");
+    lib.addCSourceFile(.{ .file = b.path("src/sqlite3.c") });
     lib.linkLibC();
     b.installArtifact(lib);
 
@@ -28,21 +28,21 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    shell.addCSourceFile(.{ .file = .{ .path = "src/shell.c" } });
+    shell.addCSourceFile(.{ .file = b.path("src/shell.c") });
     shell.linkLibrary(lib);
     if (should_install_shell) {
         b.installArtifact(shell);
     }
 
     const module = b.addModule("sqlite3", .{
-        .root_source_file = .{ .path = "src/sqlite3.zig" },
+        .root_source_file = b.path("src/sqlite3.zig"),
         .target = target,
         .optimize = optimize,
     });
     module.linkLibrary(lib);
 
     const test_exe = b.addTest(.{
-        .root_source_file = .{ .path = "src/sqlite3.zig" },
+        .root_source_file = b.path("src/sqlite3.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -57,7 +57,7 @@ pub fn build(b: *std.Build) void {
     inline for (EXAMPLES) |example_name| {
         const example = b.addExecutable(.{
             .name = example_name,
-            .root_source_file = .{ .path = "examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig" },
+            .root_source_file = b.path("examples" ++ std.fs.path.sep_str ++ example_name ++ ".zig"),
             .target = target,
             .optimize = optimize,
         });
